@@ -375,9 +375,10 @@ client.once('ready', async () => {
 
     await resolveLogChannels();
 
-    // Neustart = alle Logs loeschen - ausser #all-logs (bleibt als Archiv erhalten).
+    // Neustart = alle Logs loeschen - ausser Archiv-Channels (bleiben erhalten).
+    const keepOnRestart = new Set(['all', 'login', 'inject']);
     for (const key of Object.keys(LOG_CHANNEL_NAMES)) {
-        if (key === 'all') continue;
+        if (keepOnRestart.has(key)) continue;
         const ch = getLogChannel(key);
         if (!ch) continue;
         try {
@@ -729,12 +730,21 @@ async function updateBotPanel() {
 // Statische Header (#inject / #login)
 //
 // =================================
+async function channelIsEmpty(channel) {
+    try {
+        const msgs = await channel.messages.fetch({ limit: 1 });
+        return msgs.size === 0;
+    } catch (e) { return true; }
+}
+
 async function sendStaticHeaders() {
     try {
+        // Header nur posten, wenn der Channel leer ist (keine Doppel-Header nach Restart,
+        // da #inject/#login jetzt erhalten bleiben).
         const inj = getLogChannel('inject');
-        if (inj) await inj.send({ embeds: [new EmbedBuilder().setTitle('💉 Inject Logs').setDescription('> Jeder Inject aus dem Loader landet hier mit Key + Zeitpunkt.').setColor('Purple')] }).catch(() => {});
+        if (inj && await channelIsEmpty(inj)) await inj.send({ embeds: [new EmbedBuilder().setTitle('💉 Inject Logs').setDescription('> Jeder Inject aus dem Loader landet hier mit Key + Zeitpunkt.').setColor('Purple')] }).catch(() => {});
         const log = getLogChannel('login');
-        if (log) await log.send({ embeds: [new EmbedBuilder().setTitle('🔐 Login Logs').setDescription('> Jeder Loader-Login landet hier.').setColor('Blue')] }).catch(() => {});
+        if (log && await channelIsEmpty(log)) await log.send({ embeds: [new EmbedBuilder().setTitle('🔐 Login Logs').setDescription('> Jeder Loader-Login landet hier.').setColor('Blue')] }).catch(() => {});
         // #logger bleibt vorerst leer.
     } catch (e) { console.error('sendStaticHeaders:', e.message); }
 }
