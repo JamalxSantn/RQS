@@ -4,8 +4,11 @@ const { open } = require('sqlite');
 let db;
 
 async function initializeDatabase() {
+    // DB_PATH setzen, wenn die DB auf einer persistenten Disk liegt (Render).
+    const dbFile = process.env.DB_PATH || './licenses.db';
+    console.log(`Datenbankdatei: ${dbFile}`);
     db = await open({
-        filename: './licenses.db',
+        filename: dbFile,
         driver: sqlite3.Database
     });
 
