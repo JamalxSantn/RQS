@@ -1,14 +1,82 @@
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 
-let db;
+// Backend-Wahl: Mit DATABASE_URL -> Postgres (Neon, persistent).
+// Ohne -> lokales SQLite (wie bisher).
+const usePg = !!process.env.DATABASE_URL;
+
+let db = null;     // sqlite
+let pgPool = null; // postgres
 
 async function initializeDatabase() {
-    // DB_PATH setzen, wenn die DB auf einer persistenten Disk liegt (Render).
-    const dbFile = process.env.DB_PATH || './licenses.db';
-    console.log(`Datenbankdatei: ${dbFile}`);
+    if (usePg) {
+        const { Pool } = require('pg');
+        pgPool = new Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false },
+            max: 5,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 10000
+        });
+        pgPool.on('error', (e) => console.error('pg pool error:', e.message));
+
+        await pgPool.query(`
+            CREATE TABLE IF NOT EXISTS licenses (
+                license_key TEXT PRIMARY KEY,
+                product TEXT NOT NULL,
+                duration TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL,
+                expires_at TIMESTAMPTZ,
+                created_by_id TEXT NOT NULL,
+                created_by_tag TEXT NOT NULL,
+                resets_limit BIGINT NOT NULL,
+                resets_used BIGINT DEFAULT 0,
+                linked_discord_id TEXT,
+                linked_hwid TEXT,
+                role_redeemed BOOLEAN DEFAULT FALSE,
+                last_login TIMESTAMPTZ,
+                verification_code TEXT,
+                verification_expires TIMESTAMPTZ,
+                frozen_until TIMESTAMPTZ,
+                original_expires_at TIMESTAMPTZ,
+                last_inject TIMESTAMPTZ
+            )
+        `);
+
+        await pgPool.query(`
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                id SERIAL PRIMARY KEY,
+                license_key TEXT NOT NULL,
+                discord_id TEXT NOT NULL,
+                ip_address TEXT,
+                country TEXT,
+                start_time TIMESTAMPTZ DEFAULT NOW(),
+                end_time TIMESTAMPTZ,
+                is_active BOOLEAN DEFAULT TRUE,
+                FOREIGN KEY (license_key) REFERENCES licenses (license_key)
+            )
+        `);
+
+        await pgPool.query(`
+            CREATE TABLE IF NOT EXISTS admin_logs (
+                id SERIAL PRIMARY KEY,
+                admin_id TEXT NOT NULL,
+                admin_tag TEXT NOT NULL,
+                action TEXT NOT NULL,
+                target_license TEXT,
+                details TEXT,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        `);
+
+        await pgPool.query(`ALTER TABLE licenses ADD COLUMN IF NOT EXISTS last_inject TIMESTAMPTZ`);
+
+        console.log("Baza danych jest gotowa. (Postgres)");
+        return;
+    }
+
     db = await open({
-        filename: dbFile,
+        filename: process.env.DB_PATH || './licenses.db',
         driver: sqlite3.Database
     });
 
@@ -67,29 +135,58 @@ async function initializeDatabase() {
         // Spalte existiert bereits -> ignorieren.
     }
 
-    console.log("Baza danych jest gotowa.");
+    console.log("Baza danych jest gotowa. (SQLite)");
 }
 
 // PODSTAWOWE FUNKCJE DO LICENCJI
 const getLicense = async (licenseKey) => {
+    if (usePg) {
+        const r = await pgPool.query('SELECT * FROM licenses WHERE license_key = $1', [licenseKey]);
+        return r.rows[0];
+    }
     return await db.get('SELECT * FROM licenses WHERE license_key = ?', licenseKey);
 };
 
 const deleteLicenseDB = async (licenseKey) => {
+    if (usePg) {
+        return await pgPool.query('DELETE FROM licenses WHERE license_key = $1', [licenseKey]);
+    }
     return await db.run('DELETE FROM licenses WHERE license_key = ?', licenseKey);
 };
 
 const getLicenseByHwid = async (hwid) => {
     if (!hwid) return undefined;
+    if (usePg) {
+        const r = await pgPool.query('SELECT * FROM licenses WHERE linked_hwid = $1', [hwid]);
+        return r.rows[0];
+    }
     return await db.get('SELECT * FROM licenses WHERE linked_hwid = ?', hwid);
 };
 
 const getLicensesByDiscordId = async (discordId) => {
     if (!discordId) return [];
+    if (usePg) {
+        const r = await pgPool.query('SELECT * FROM licenses WHERE linked_discord_id = $1 ORDER BY created_at DESC', [discordId]);
+        return r.rows;
+    }
     return await db.all('SELECT * FROM licenses WHERE linked_discord_id = ? ORDER BY created_at DESC', discordId);
 };
 
 const getActiveSessions = async () => {
+    if (usePg) {
+        const r = await pgPool.query(`SELECT
+            us.license_key,
+            us.discord_id,
+            us.start_time,
+            l.product,
+            l.expires_at,
+            l.linked_hwid
+        FROM user_sessions us
+        JOIN licenses l ON us.license_key = l.license_key
+        WHERE us.is_active = TRUE
+        ORDER BY us.start_time DESC`);
+        return r.rows;
+    }
     return await db.all(`SELECT
         us.license_key,
         us.discord_id,
@@ -105,66 +202,135 @@ const getActiveSessions = async () => {
 
 const addLicense = async (licenseData) => {
     const { key, product, duration, createdAt, expiresAt, createdById, createdByTag, resetsLimit } = licenseData;
+    if (usePg) {
+        return await pgPool.query(
+            `INSERT INTO licenses (license_key, product, duration, created_at, expires_at, created_by_id, created_by_tag, resets_limit)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [key, product, duration, createdAt, expiresAt, createdById, createdByTag, resetsLimit]
+        );
+    }
     return await db.run(
-        `INSERT INTO licenses (license_key, product, duration, created_at, expires_at, created_by_id, created_by_tag, resets_limit) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO licenses (license_key, product, duration, created_at, expires_at, created_by_id, created_by_tag, resets_limit)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         key, product, duration, createdAt, expiresAt, createdById, createdByTag, resetsLimit
     );
 };
 
 const updateLicense = async (licenseKey, updates) => {
-    const setClause = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const keys = Object.keys(updates);
     const values = Object.values(updates);
+    if (usePg) {
+        const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+        values.push(licenseKey);
+        return await pgPool.query(
+            `UPDATE licenses SET ${setClause} WHERE license_key = $${keys.length + 1}`, values);
+    }
+    const setClause = keys.map(key => `${key} = ?`).join(', ');
     values.push(licenseKey);
     return await db.run(`UPDATE licenses SET ${setClause} WHERE license_key = ?`, values);
 };
 
 // FUNKCJE STATYSTYK
 const getActiveLicensesCount = async () => {
-    const result = await db.get(`SELECT COUNT(*) as count FROM licenses 
-                         WHERE (expires_at IS NULL OR expires_at > datetime('now')) 
+    if (usePg) {
+        const r = await pgPool.query(`SELECT COUNT(*)::int as count FROM licenses
+                             WHERE (expires_at IS NULL OR expires_at > NOW())
+                             AND linked_discord_id IS NOT NULL`);
+        return r.rows[0];
+    }
+    const result = await db.get(`SELECT COUNT(*) as count FROM licenses
+                         WHERE (expires_at IS NULL OR expires_at > datetime('now'))
                          AND linked_discord_id IS NOT NULL`);
     return result;
 };
 
 const getActiveUsersCount = async () => {
-    const result = await db.get(`SELECT COUNT(DISTINCT linked_discord_id) as count FROM licenses 
-                         WHERE (expires_at IS NULL OR expires_at > datetime('now')) 
+    if (usePg) {
+        const r = await pgPool.query(`SELECT COUNT(DISTINCT linked_discord_id)::int as count FROM licenses
+                             WHERE (expires_at IS NULL OR expires_at > NOW())
+                             AND linked_discord_id IS NOT NULL`);
+        return r.rows[0];
+    }
+    const result = await db.get(`SELECT COUNT(DISTINCT linked_discord_id) as count FROM licenses
+                         WHERE (expires_at IS NULL OR expires_at > datetime('now'))
                          AND linked_discord_id IS NOT NULL`);
     return result;
 };
 
 const getLicenseStats = async () => {
-    return await db.all(`SELECT 
+    if (usePg) {
+        const r = await pgPool.query(`SELECT
+            product,
+            COUNT(*)::int as total,
+            SUM(CASE WHEN linked_discord_id IS NOT NULL THEN 1 ELSE 0 END)::int as activated,
+            SUM(CASE WHEN linked_discord_id IS NULL THEN 1 ELSE 0 END)::int as available,
+            SUM(CASE WHEN expires_at < NOW() THEN 1 ELSE 0 END)::int as expired
+        FROM licenses
+        GROUP BY product`);
+        return r.rows;
+    }
+    return await db.all(`SELECT
         product,
         COUNT(*) as total,
         SUM(CASE WHEN linked_discord_id IS NOT NULL THEN 1 ELSE 0 END) as activated,
         SUM(CASE WHEN linked_discord_id IS NULL THEN 1 ELSE 0 END) as available,
         SUM(CASE WHEN expires_at < datetime('now') THEN 1 ELSE 0 END) as expired
-    FROM licenses 
+    FROM licenses
     GROUP BY product`);
 };
 
 const getCountryStats = async () => {
-    return await db.all(`SELECT 
-        country, 
+    if (usePg) {
+        const r = await pgPool.query(`SELECT
+            country,
+            COUNT(*)::int as user_count,
+            ROUND(COUNT(*) * 100.0 / NULLIF((SELECT COUNT(*) FROM user_sessions WHERE is_active = TRUE), 0), 2) as percentage
+        FROM user_sessions
+        WHERE is_active = TRUE
+        GROUP BY country
+        ORDER BY user_count DESC`);
+        return r.rows;
+    }
+    return await db.all(`SELECT
+        country,
         COUNT(*) as user_count,
         ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM user_sessions WHERE is_active = 1), 2) as percentage
-    FROM user_sessions 
-    WHERE is_active = 1 
-    GROUP BY country 
+    FROM user_sessions
+    WHERE is_active = 1
+    GROUP BY country
     ORDER BY user_count DESC`);
 };
 
 const getResetStats = async () => {
-    return await db.get(`SELECT 
+    if (usePg) {
+        const r = await pgPool.query(`SELECT
+            SUM(resets_used) as total_resets_used,
+            SUM(CASE WHEN resets_limit = -1 THEN 0 ELSE resets_limit END) as total_resets_available
+        FROM licenses`);
+        return r.rows[0];
+    }
+    return await db.get(`SELECT
         SUM(resets_used) as total_resets_used,
         SUM(CASE WHEN resets_limit = -1 THEN 0 ELSE resets_limit END) as total_resets_available
     FROM licenses`);
 };
 
 const getRecentActivity = async () => {
-    return await db.all(`SELECT 
+    if (usePg) {
+        const r = await pgPool.query(`SELECT
+            us.license_key,
+            l.product,
+            us.discord_id,
+            us.country,
+            us.start_time
+        FROM user_sessions us
+        JOIN licenses l ON us.license_key = l.license_key
+        WHERE us.is_active = TRUE
+        ORDER BY us.start_time DESC
+        LIMIT 10`);
+        return r.rows;
+    }
+    return await db.all(`SELECT
         us.license_key,
         l.product,
         us.discord_id,
@@ -180,16 +346,30 @@ const getRecentActivity = async () => {
 // FUNKCJE SESJI UŻYTKOWNIKA
 const startUserSession = async (sessionData) => {
     const { licenseKey, discordId, ipAddress, country } = sessionData;
+    if (usePg) {
+        return await pgPool.query(
+            `INSERT INTO user_sessions (license_key, discord_id, ip_address, country)
+             VALUES ($1, $2, $3, $4)`,
+            [licenseKey, discordId, ipAddress, country]
+        );
+    }
     return await db.run(
-        `INSERT INTO user_sessions (license_key, discord_id, ip_address, country) 
-         VALUES (?, ?, ?, ?)`,
+        `INSERT INTO user_sessions (license_key, discord_id, ip_address, country)
+          VALUES (?, ?, ?, ?)`,
         licenseKey, discordId, ipAddress, country
     );
 };
 
 const endUserSession = async (licenseKey) => {
+    if (usePg) {
+        return await pgPool.query(
+            `UPDATE user_sessions SET is_active = FALSE, end_time = NOW()
+             WHERE license_key = $1 AND is_active = TRUE`,
+            [licenseKey]
+        );
+    }
     return await db.run(
-        `UPDATE user_sessions SET is_active = 0, end_time = datetime('now') 
+        `UPDATE user_sessions SET is_active = 0, end_time = datetime('now')
          WHERE license_key = ? AND is_active = 1`,
         licenseKey
     );
@@ -197,6 +377,12 @@ const endUserSession = async (licenseKey) => {
 
 // FUNKCJE ZAMRAŻANIA I DODAWANIA CZASU
 const freezeLicense = async (licenseKey, frozenUntil, originalExpiresAt) => {
+    if (usePg) {
+        return pgPool.query(
+            'UPDATE licenses SET frozen_until = $1, original_expires_at = $2 WHERE license_key = $3',
+            [frozenUntil, originalExpiresAt, licenseKey]
+        );
+    }
     return db.run(
         'UPDATE licenses SET frozen_until = ?, original_expires_at = ? WHERE license_key = ?',
         frozenUntil, originalExpiresAt, licenseKey
@@ -204,7 +390,7 @@ const freezeLicense = async (licenseKey, frozenUntil, originalExpiresAt) => {
 };
 
 const unfreezeLicense = async (licenseKey) => {
-    const license = await db.get('SELECT * FROM licenses WHERE license_key = ?', licenseKey);
+    const license = await getLicense(licenseKey);
     if (!license) return null;
 
     let newExpiresAt = license.expires_at;
@@ -213,6 +399,12 @@ const unfreezeLicense = async (licenseKey) => {
         newExpiresAt = license.original_expires_at;
     }
 
+    if (usePg) {
+        return pgPool.query(
+            'UPDATE licenses SET frozen_until = NULL, original_expires_at = NULL, expires_at = $1 WHERE license_key = $2',
+            [newExpiresAt, licenseKey]
+        );
+    }
     return db.run(
         'UPDATE licenses SET frozen_until = NULL, original_expires_at = NULL, expires_at = ? WHERE license_key = ?',
         newExpiresAt, licenseKey
@@ -220,7 +412,7 @@ const unfreezeLicense = async (licenseKey) => {
 };
 
 const addTimeToLicense = async (licenseKey, timeToAdd) => {
-    const license = await db.get('SELECT * FROM licenses WHERE license_key = ?', licenseKey);
+    const license = await getLicense(licenseKey);
     if (!license) return null;
 
     let newExpiresAt = new Date(license.expires_at);
@@ -231,6 +423,12 @@ const addTimeToLicense = async (licenseKey, timeToAdd) => {
         return null;
     }
 
+    if (usePg) {
+        return pgPool.query(
+            'UPDATE licenses SET expires_at = $1 WHERE license_key = $2',
+            [newExpiresAt.toISOString(), licenseKey]
+        );
+    }
     return db.run(
         'UPDATE licenses SET expires_at = ? WHERE license_key = ?',
         newExpiresAt.toISOString(), licenseKey
@@ -238,22 +436,47 @@ const addTimeToLicense = async (licenseKey, timeToAdd) => {
 };
 
 // FUNKCJE POBRANIA LICENCJI
-const getFrozenLicenses = () => 
-    db.all('SELECT * FROM licenses WHERE frozen_until IS NOT NULL');
+const getFrozenLicenses = async () => {
+    if (usePg) {
+        const r = await pgPool.query('SELECT * FROM licenses WHERE frozen_until IS NOT NULL');
+        return r.rows;
+    }
+    return db.all('SELECT * FROM licenses WHERE frozen_until IS NOT NULL');
+};
 
-const getActiveLicenses = () =>
-    db.all(`SELECT * FROM licenses 
-            WHERE (expires_at IS NULL OR expires_at > datetime('now')) 
+const getActiveLicenses = async () => {
+    if (usePg) {
+        const r = await pgPool.query(`SELECT * FROM licenses
+            WHERE (expires_at IS NULL OR expires_at > NOW())
             AND linked_discord_id IS NOT NULL`);
+        return r.rows;
+    }
+    return db.all(`SELECT * FROM licenses
+            WHERE (expires_at IS NULL OR expires_at > datetime('now'))
+            AND linked_discord_id IS NOT NULL`);
+};
 
-const getAllLicenses = () => db.all('SELECT * FROM licenses ORDER BY created_at DESC');
+const getAllLicenses = async () => {
+    if (usePg) {
+        const r = await pgPool.query('SELECT * FROM licenses ORDER BY created_at DESC');
+        return r.rows;
+    }
+    return db.all('SELECT * FROM licenses ORDER BY created_at DESC');
+};
 
 // FUNKCJE LOGOWANIA
-const logAdminAction = (adminId, adminTag, action, targetLicense, details) =>
-    db.run(
+const logAdminAction = (adminId, adminTag, action, targetLicense, details) => {
+    if (usePg) {
+        return pgPool.query(
+            'INSERT INTO admin_logs (admin_id, admin_tag, action, target_license, details) VALUES ($1, $2, $3, $4, $5)',
+            [adminId, adminTag, action, targetLicense, details]
+        );
+    }
+    return db.run(
         'INSERT INTO admin_logs (admin_id, admin_tag, action, target_license, details) VALUES (?, ?, ?, ?, ?)',
         adminId, adminTag, action, targetLicense, details
     );
+};
 
 module.exports = {
     initializeDatabase,

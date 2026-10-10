@@ -1552,7 +1552,7 @@ async function handleModal(interaction) {
         try {
             const role = await interaction.guild.roles.fetch(config.customerRoleId);
             if (role) await interaction.member.roles.add(role);
-            await db.updateLicense(licenseKey, { role_redeemed: 1 });
+            await db.updateLicense(licenseKey, { role_redeemed: true });
             return interaction.editReply({ content: "Successfully received the customer role!" });
         } catch (error) {
             console.error("Error assigning role:", error);
