@@ -1983,6 +1983,16 @@ async function sendResetLog(type, interaction, license, data) {
 const app = express();
 app.use(express.json());
 
+// Health-Check fuer Uptime-Monitore (haelt Render-Free wach).
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: "ok",
+        bot: client.user ? client.user.tag : "starting",
+        uptime_ms: Date.now() - bootTime,
+        guilds: client.guilds.cache.size
+    });
+});
+
 app.post('/api/start-session', async (req, res) => {
     const { licenseKey, discordId, ipAddress } = req.body;
     
