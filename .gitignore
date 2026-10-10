@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Secrets - NIEMALS hochladen (Token steht in Render als Env-Variable)
+config.json
+.env
+
+# Lokale Datenbank (Lizenzen, HWIDs, Discord-IDs - NICHT oeffentlich machen)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+
+# Bot-Lock + Backups
+bot.lock
+*.bak
+*.tmp
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db

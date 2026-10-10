@@ -1,0 +1,15 @@
+{
+    "_hinweis": "Diese Datei NICHT mit echtem Token hochladen. Auf Render: BOT_TOKEN als Environment-Variable setzen. Lokal: als config.json kopieren + Token eintragen.",
+    "botToken": "PASTE_YOUR_BOT_TOKEN_HERE",
+    "guildId": "1557841343491866795",
+    "adminRoleId": "",
+    "deleteRoleId": "",
+    "customerRoleId": "",
+    "adminHwidResetRoleId": "",
+    "adminDiscordResetRoleId": "",
+    "apiPort": 3000,
+    "enableStatsChannels": false,
+    "logChannels": {},
+    "chatUsers": {},
+    "voiceChannels": {}
+}
