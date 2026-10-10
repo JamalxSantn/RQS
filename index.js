@@ -1458,7 +1458,7 @@ async function handleButton(interaction) {
 async function createLicense(interaction, opts) {
     const { product, durationStr, expiresAt, planLabel, resetsStr } = opts;
 
-    const licenseKey = `${product}-${generateRandomString(6)}-${generateRandomString(6)}-${generateRandomString(6)}`;
+    const licenseKey = `RQS-${generateRandomString(6)}-${generateRandomString(6)}-${generateRandomString(6)}`;
     const createdAt = new Date();
     const resetsLimit = resetsStr === '*' ? -1 : parseInt(resetsStr);
     if (isNaN(resetsLimit) || resetsLimit < 0) return { error: "Reset count must be a number or '*'." };
