@@ -23,6 +23,27 @@
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || process.env.CLOUD_ADMIN_PASSWORD || 'Rayx123';
 
+// ---- IP-Versteckung ----------------------------------------------------
+// Eintraege, deren IP nie ans Panel geschickt wird (auch nicht per Klick sichtbar).
+// Standard: der eigene PC des Owners. Per Env-Variable anpassbar.
+const parseList = (v) => String(v || '').split(',').map(s => s.trim()).filter(Boolean);
+const HIDDEN_IP_HWIDS = parseList(process.env.HIDDEN_IP_HWIDS || '811C9DC5').map(s => s.toUpperCase());
+const HIDDEN_IP_USERS = parseList(process.env.HIDDEN_IP_USERS || 'jamal').map(s => s.toLowerCase());
+const HIDDEN_IP_PCS = parseList(process.env.HIDDEN_IP_PCS || 'desktop-hoot6ng').map(s => s.toLowerCase());
+
+const isIpHidden = (entry) => {
+    if (!entry) return false;
+    const hwid = String(entry.hwid || '').trim().toUpperCase();
+    const user = String(entry.windows_user || '').trim().toLowerCase();
+    const pc = String(entry.pc_name || '').trim().toLowerCase();
+    return (hwid && HIDDEN_IP_HWIDS.includes(hwid))
+        || (user && HIDDEN_IP_USERS.includes(user))
+        || (pc && HIDDEN_IP_PCS.includes(pc));
+};
+
+// Liefert die IP nur, wenn sie nicht versteckt werden soll.
+const visibleIp = (entry) => isIpHidden(entry) ? '' : (entry.ip || '');
+
 // Vom Bot befüllte Einmal-Codes (Map: code -> { expires, adminTag }).
 let loginCodes = new Map();
 const LOGIN_CODE_TTL_MS = 5 * 60 * 1000;
@@ -141,7 +162,7 @@ function registerCloudRoutes({ app, db, loginCodes: sharedLoginCodes }) {
                 hwid: e.hwid,
                 pcName: e.pc_name || '',
                 windowsUser: e.windows_user || '',
-                ip: e.ip || '',
+                ip: visibleIp(e),
                 configSize: e.config_size || 0,
                 createdAt: e.created_at ? new Date(e.created_at).toISOString() : '',
                 updatedAt: e.updated_at ? new Date(e.updated_at).toISOString() : '',
@@ -184,7 +205,7 @@ function registerCloudRoutes({ app, db, loginCodes: sharedLoginCodes }) {
                     if (!entry) return res.status(404).json({ success: false, error: 'not found' });
                     let config;
                     try { config = JSON.parse(entry.config); } catch { config = {}; }
-                    return res.json({ success: true, entry: { hwid, pcName: entry.pc_name, windowsUser: entry.windows_user, ip: entry.ip, configSize: entry.config_size, createdAt: entry.created_at, updatedAt: entry.updated_at, lastSeen: entry.last_seen, config } });
+                    return res.json({ success: true, entry: { hwid, pcName: entry.pc_name, windowsUser: entry.windows_user, ip: visibleIp(entry), configSize: entry.config_size, createdAt: entry.created_at, updatedAt: entry.updated_at, lastSeen: entry.last_seen, config } });
                 } catch (e) { return res.status(500).json({ success: false, error: 'db error' }); }
             })();
             return;
