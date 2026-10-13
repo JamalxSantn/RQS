@@ -215,6 +215,11 @@ function registerCloudRoutes({ app, db, loginCodes: sharedLoginCodes }) {
     app.get('/cloud/panel', (req, res) => {
         res.sendFile(require('path').join(__dirname, 'cloud_panel.html'));
     });
+
+    // ---------- Panel-Logo ----------
+    app.get('/cloud/logo', (req, res) => {
+        res.sendFile(require('path').join(__dirname, 'cloud_logo.png'));
+    });
 }
 
 module.exports = registerCloudRoutes;

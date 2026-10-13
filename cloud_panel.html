@@ -6,16 +6,18 @@
 <title>Config Cloud · Panel</title>
 <style>
   :root {
-    --bg: #0b0e14;
-    --panel: #131722;
-    --panel-2: #1a2030;
-    --border: #232a3d;
-    --text: #dce3f1;
-    --muted: #8190ab;
-    --accent: #4f7cff;
-    --green: #2fd07a;
+    --bg: #070511;
+    --panel: rgba(20, 14, 38, 0.72);
+    --panel-solid: #140e26;
+    --panel-2: rgba(38, 26, 68, 0.55);
+    --border: #34235c;
+    --text: #ece7fb;
+    --muted: #9d8fc4;
+    --accent: #a855f7;
+    --accent-2: #7c3aed;
+    --green: #34d399;
     --red: #ff5f6b;
-    --yellow: #ffc44d;
+    --yellow: #fbbf24;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -23,7 +25,25 @@
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
+    position: relative;
   }
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background: url('/cloud/logo') center / min(72vw, 680px) no-repeat;
+    opacity: 0.16;
+    pointer-events: none;
+    z-index: 0;
+  }
+  body::after {
+    content: "";
+    position: fixed; inset: 0;
+    background: radial-gradient(circle at 50% 0%, rgba(168,85,247,.14), transparent 55%),
+                radial-gradient(circle at 50% 100%, rgba(124,58,237,.10), transparent 55%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  #loginView, #appView, header, main { position: relative; z-index: 1; }
   .login-wrap {
     display: flex; align-items: center; justify-content: center;
     min-height: 100vh; padding: 16px;
@@ -31,9 +51,11 @@
   .login-card {
     width: 100%; max-width: 360px;
     background: var(--panel);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
     border: 1px solid var(--border);
     border-radius: 14px;
     padding: 32px 28px;
+    box-shadow: 0 20px 60px rgba(124,58,237,.25);
   }
   .login-card h1 { font-size: 20px; margin-bottom: 4px; }
   .login-card p { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
@@ -58,6 +80,7 @@
     display: flex; align-items: center; justify-content: space-between;
     padding: 18px 24px; border-bottom: 1px solid var(--border);
     background: var(--panel); position: sticky; top: 0; z-index: 10;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   }
   header h1 { font-size: 17px; display: flex; align-items: center; gap: 10px; }
   .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); display: inline-block; }
@@ -76,29 +99,30 @@
   .stat {
     background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
     padding: 16px 18px;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   }
   .stat .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
   .stat .value { font-size: 26px; font-weight: 700; margin-top: 4px; }
 
-  .table-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .table-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   thead th {
     text-align: left; padding: 12px 16px; color: var(--muted); font-weight: 600;
     font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
-    border-bottom: 1px solid var(--border); background: var(--panel-2);
+    border-bottom: 1px solid var(--border); background: rgba(56,38,96,.5);
     white-space: nowrap;
   }
   tbody td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  tbody tr:hover { background: rgba(79,124,255,.06); }
+  tbody tr:hover { background: rgba(168,85,247,.09); }
   tbody tr:last-child td { border-bottom: none; }
   .badge {
     display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700;
   }
-  .badge-new { background: rgba(47,208,122,.15); color: var(--green); }
-  .badge-muted { background: rgba(129,144,171,.15); color: var(--muted); }
+  .badge-new { background: rgba(52,211,153,.16); color: var(--green); }
+  .badge-muted { background: rgba(157,143,196,.15); color: var(--muted); }
   code {
     font-family: "Cascadia Code", Consolas, monospace; font-size: 12px;
-    background: var(--panel-2); padding: 2px 7px; border-radius: 5px; color: #a9bfff;
+    background: rgba(124,58,237,.18); padding: 2px 7px; border-radius: 5px; color: #c4a7ff;
   }
   .empty {
     text-align: center; color: var(--muted); padding: 40px 0; font-size: 14px;
@@ -106,14 +130,20 @@
   .mono { font-family: "Cascadia Code", Consolas, monospace; }
   .spark { display: inline-flex; gap: 3px; }
 
+  .ip { cursor: pointer; user-select: none; transition: color .15s; border-bottom: 1px dashed rgba(157,143,196,.5); }
+  .ip:hover { color: var(--accent); }
+  .ip.hidden { filter: blur(3px); letter-spacing: 2px; }
+
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,.6);
     display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px;
   }
   .modal-overlay.open { display: flex; }
   .modal {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    background: var(--panel-solid); border: 1px solid var(--border); border-radius: 14px;
     width: 100%; max-width: 760px; max-height: 82vh; display: flex; flex-direction: column;
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 24px 70px rgba(124,58,237,.35);
   }
   .modal-head {
     display: flex; align-items: center; justify-content: space-between;
@@ -133,9 +163,10 @@
 
   .toast {
     position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(80px);
-    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    background: var(--panel-solid); border: 1px solid var(--border); color: var(--text);
     padding: 12px 20px; border-radius: 10px; font-size: 13px; opacity: 0; transition: all .25s;
     z-index: 100;
+    box-shadow: 0 10px 40px rgba(124,58,237,.3);
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .toast.ok { border-color: var(--green); }
@@ -152,8 +183,9 @@
 
 <div id="loginView" class="login-wrap">
   <div class="login-card">
-    <h1>Config Cloud</h1>
-    <p>Melde dich mit dem Login-Code aus Discord an.</p>
+    <img src="/cloud/logo" alt="Logo" style="width:84px;height:84px;object-fit:contain;display:block;margin:0 auto 16px;filter:drop-shadow(0 0 20px rgba(168,85,247,.65))">
+    <h1 style="text-align:center">Config Cloud</h1>
+    <p style="text-align:center">Melde dich mit dem Login-Code aus Discord an.</p>
     <input id="code" type="text" placeholder="Login-Code (z.B. K7M2QP)" maxlength="12" style="text-transform:uppercase;letter-spacing:2px;font-weight:600" autocomplete="off">
     <button class="btn-primary" onclick="doLogin()">Anmelden</button>
     <div style="text-align:center;margin:16px 0 12px;color:var(--muted);font-size:12px">oder Admin-Passwort</div>
@@ -164,7 +196,7 @@
 
 <div id="appView" style="display:none">
   <header>
-    <h1><span class="dot"></span> Config Cloud · Panel</h1>
+    <h1><img src="/cloud/logo" alt="" style="width:26px;height:26px;object-fit:contain"><span class="dot"></span> Config Cloud · Panel</h1>
     <div class="actions">
       <span id="whoami" class="muted" style="font-size:13px"></span>
       <input id="search" class="search" placeholder="Suchen (HWID / PC / User)" oninput="render()">
@@ -264,7 +296,7 @@ function render() {
       '<td><code>' + (c.hwid || '').replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</code></td>' +
       '<td>' + esc(c.pcName) + '</td>' +
       '<td>' + esc(c.windowsUser) + '</td>' +
-      '<td class="mono muted">' + esc(c.ip || '–') + '</td>' +
+      '<td class="mono">' + ipCell(c.ip) + '</td>' +
       '<td>' + sizeStr(c.configSize) + '</td>' +
       '<td class="muted">' + fmtTime(c.lastSeen || c.updatedAt) + '</td>' +
       '<td>' + (c.isNew ? '<span class="badge badge-new">NEU</span>' : '<span class="badge badge-muted">ok</span>') + '</td>' +
@@ -278,6 +310,18 @@ function render() {
 }
 
 function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function ipCell(ip) {
+  if (!ip) return '<span class="muted">–</span>';
+  const safe = esc(ip);
+  const mask = '•'.repeat(Math.min(safe.length, 15));
+  return '<span class="ip hidden" data-ip="' + safe + '" onclick="toggleIp(this)" title="Klick zum Anzeigen">' + mask + '</span>';
+}
+
+function toggleIp(el) {
+  const nowHidden = el.classList.toggle('hidden');
+  el.textContent = nowHidden ? '•'.repeat(Math.min(el.dataset.ip.length, 15)) : el.dataset.ip;
+}
 
 async function loadConfigs() {
   try {
@@ -295,7 +339,7 @@ async function showDetail(hwid) {
       '<div class="meta-item"><div class="k">HWID</div><div class="v"><code>' + esc(hwid) + '</code></div></div>' +
       '<div class="meta-item"><div class="k">PC</div><div class="v">' + esc(e.pcName||'–') + '</div></div>' +
       '<div class="meta-item"><div class="k">Windows-User</div><div class="v">' + esc(e.windowsUser||'–') + '</div></div>' +
-      '<div class="meta-item"><div class="k">IP</div><div class="v">' + esc(e.ip||'–') + '</div></div>' +
+      '<div class="meta-item"><div class="k">IP</div><div class="v mono">' + ipCell(e.ip) + '</div></div>' +
       '<div class="meta-item"><div class="k">Größe</div><div class="v">' + sizeStr(e.configSize) + '</div></div>' +
       '<div class="meta-item"><div class="k">Erstellt</div><div class="v">' + fmtTime(e.createdAt) + '</div></div>' +
       '<div class="meta-item"><div class="k">Aktualisiert</div><div class="v">' + fmtTime(e.updatedAt) + '</div></div>';
