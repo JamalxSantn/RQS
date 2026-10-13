@@ -160,6 +160,9 @@ async function getCountryFromIP(ip) {
 // =================================
 const bootTime = Date.now();
 
+// Diagnose: zaehlt empfangene Interaktionen (hilft, doppelte Bot-Instanzen zu erkennen).
+const interactionStats = { total: 0, buttons: 0, cloudLogin: 0, lastCustomId: null, lastError: null, lastErrorAt: null };
+
 // Einmal-Login-Codes fuer das Config-Cloud-Web-Panel (Discord-Login).
 const cloudLoginCodes = new Map();
 const CLOUD_PANEL_URL = process.env.CLOUD_PANEL_URL || 'https://rqs-0trt.onrender.com/cloud/panel';
@@ -933,6 +936,12 @@ async function updateStatsChannels() {
 //
 client.on('interactionCreate', async interaction => {
     try {
+        interactionStats.total++;
+        if (interaction.isButton()) {
+            interactionStats.buttons++;
+            interactionStats.lastCustomId = interaction.customId;
+            if (interaction.customId === 'cloud_panel_login') interactionStats.cloudLogin++;
+        }
         if (interaction.isChatInputCommand()) {
             await handleSlashCommand(interaction);
         } else if (interaction.isButton()) {
@@ -941,6 +950,8 @@ client.on('interactionCreate', async interaction => {
             await handleModal(interaction);
         }
     } catch (err) {
+        interactionStats.lastError = (err && err.message) ? err.message : String(err);
+        interactionStats.lastErrorAt = new Date().toISOString();
         console.error(`[INTERACTION-ERROR] id=${interaction.customId || interaction.commandName} von ${interaction.user ? interaction.user.tag : '?'}:`, err && err.stack ? err.stack : err);
         try {
             const msg = `⚠️ Fehler bei dieser Aktion: ${err && err.message ? err.message : err}`;
@@ -2382,6 +2393,14 @@ require('./chat_party.js')({ app, db, client, config, planOfLicense, formatExpir
 
 // Config Cloud (Sicherung der Cheat-Einstellungen in der DB, statt separatem Server).
 require('./config_cloud.js')({ app, db, loginCodes: cloudLoginCodes });
+
+// Diagnose: zeigt, welche Interaktionen dieser Prozess zuletzt empfangen hat.
+app.get('/debug/interactions', (req, res) => {
+    const token = req.headers['x-admin-token'] || req.query.token;
+    const pass = process.env.ADMIN_PASSWORD || process.env.CLOUD_ADMIN_PASSWORD || 'Rayx123';
+    if (token !== pass) return res.status(401).json({ success: false });
+    res.json({ success: true, bot: client.user ? client.user.tag : null, pid: process.pid, startedAt: new Date(bootTime).toISOString(), ...interactionStats });
+});
 
 const listenPort = process.env.PORT ? Number(process.env.PORT) : config.apiPort;
 app.listen(listenPort, () => {
