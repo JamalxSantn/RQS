@@ -773,6 +773,8 @@ function cloudLoginRow() {
     );
 }
 
+let cloudPanel = null; // { channelId, messageId }
+
 async function sendCloudPanel() {
     const channel = await client.channels.fetch(CLOUD_PANEL_CHANNEL_ID).catch(() => null);
     if (!channel || !channel.isTextBased || !channel.isTextBased()) {
@@ -780,7 +782,26 @@ async function sendCloudPanel() {
         return;
     }
     try {
-        await channel.send({ embeds: [buildCloudPanelEmbed()], components: [cloudLoginRow()] });
+        let existing = cloudPanel
+            ? await channel.messages.fetch(cloudPanel.messageId).catch(() => null)
+            : null;
+        if (!existing) {
+            const recent = await channel.messages.fetch({ limit: 25 }).catch(() => null);
+            if (recent) {
+                existing = recent.find(m =>
+                    m.author.id === client.user.id &&
+                    m.components && m.components.some(r => (r.components || []).some(c => (c.customId || c.custom_id) === 'cloud_panel_login'))
+                ) || null;
+            }
+        }
+        if (existing) {
+            cloudPanel = { channelId: channel.id, messageId: existing.id };
+            await existing.edit({ embeds: [buildCloudPanelEmbed()], components: [cloudLoginRow()] }).catch(() => {});
+            console.log('Config-Cloud panel updated.');
+            return;
+        }
+        const msg = await channel.send({ embeds: [buildCloudPanelEmbed()], components: [cloudLoginRow()] });
+        cloudPanel = { channelId: channel.id, messageId: msg.id };
         console.log('Config-Cloud panel has been sent.');
     } catch (e) { console.error('Error sending cloud panel:', e.message); }
 }
