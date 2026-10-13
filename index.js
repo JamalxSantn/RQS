@@ -2273,6 +2273,9 @@ app.post('/api/log-failed-login', async (req, res) => {
 // Chat + Party API for the cheat menu (presence, global/party chat, parties).
 require('./chat_party.js')({ app, db, client, config, planOfLicense, formatExpiry });
 
+// Config Cloud (Sicherung der Cheat-Einstellungen in der DB, statt separatem Server).
+require('./config_cloud.js')({ app, db });
+
 const listenPort = process.env.PORT ? Number(process.env.PORT) : config.apiPort;
 app.listen(listenPort, () => {
     console.log(`API server listening on port ${listenPort}`);

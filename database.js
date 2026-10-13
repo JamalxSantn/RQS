@@ -71,6 +71,20 @@ async function initializeDatabase() {
 
         await pgPool.query(`ALTER TABLE licenses ADD COLUMN IF NOT EXISTS last_inject TIMESTAMPTZ`);
 
+        await pgPool.query(`
+            CREATE TABLE IF NOT EXISTS cloud_configs (
+                hwid TEXT PRIMARY KEY,
+                config TEXT NOT NULL,
+                pc_name TEXT,
+                windows_user TEXT,
+                ip TEXT,
+                config_size INT DEFAULT 0,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                last_seen TIMESTAMPTZ
+            )
+        `);
+
         console.log("Baza danych jest gotowa. (Postgres)");
         return;
     }
@@ -134,6 +148,20 @@ async function initializeDatabase() {
     } catch (e) {
         // Spalte existiert bereits -> ignorieren.
     }
+
+    await db.exec(`
+        CREATE TABLE IF NOT EXISTS cloud_configs (
+            hwid TEXT PRIMARY KEY,
+            config TEXT NOT NULL,
+            pc_name TEXT,
+            windows_user TEXT,
+            ip TEXT,
+            config_size INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_seen TIMESTAMP
+        )
+    `);
 
     console.log("Baza danych jest gotowa. (SQLite)");
 }
@@ -478,6 +506,96 @@ const logAdminAction = (adminId, adminTag, action, targetLicense, details) => {
     );
 };
 
+// FUNKCJE CONFIG CHMURY (config-cloud)
+// hwid -> JSON-String. Postgres: column jsonb. SQLite: TEXT.
+const upsertCloudConfig = async (hwid, cfg) => {
+    const configStr = typeof cfg.config === 'string' ? cfg.config : JSON.stringify(cfg.config);
+    const pcName = cfg.pcName || '';
+    const windowsUser = cfg.windowsUser || '';
+    const ip = cfg.ip || '';
+    if (usePg) {
+        return await pgPool.query(`
+            INSERT INTO cloud_configs (hwid, config, pc_name, windows_user, ip, config_size, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            ON CONFLICT (hwid)
+            DO UPDATE SET config = EXCLUDED.config,
+                pc_name = EXCLUDED.pc_name,
+                windows_user = EXCLUDED.windows_user,
+                ip = EXCLUDED.ip,
+                config_size = EXCLUDED.config_size,
+                updated_at = NOW()
+        `, [hwid, configStr, pcName, windowsUser, ip, configStr.length]);
+    }
+    return await db.run(`
+        INSERT INTO cloud_configs (hwid, config, pc_name, windows_user, ip, config_size, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(hwid) DO UPDATE SET
+            config = excluded.config,
+            pc_name = excluded.pc_name,
+            windows_user = excluded.windows_user,
+            ip = excluded.ip,
+            config_size = excluded.config_size,
+            updated_at = CURRENT_TIMESTAMP
+    `, [hwid, configStr, pcName, windowsUser, ip, configStr.length]);
+};
+
+const getCloudConfig = async (hwid) => {
+    if (usePg) {
+        const r = await pgPool.query('SELECT * FROM cloud_configs WHERE hwid = $1', [hwid]);
+        return r.rows[0];
+    }
+    return await db.get('SELECT * FROM cloud_configs WHERE hwid = ?', hwid);
+};
+
+const touchCloudConfig = async (hwid, ip) => {
+    if (usePg) {
+        return await pgPool.query(
+            'UPDATE cloud_configs SET last_seen = NOW(), ip = COALESCE($2, ip) WHERE hwid = $1',
+            [hwid, ip]
+        );
+    }
+    return await db.run(
+        'UPDATE cloud_configs SET last_seen = CURRENT_TIMESTAMP, ip = COALESCE(?, ip) WHERE hwid = ?',
+        ip, hwid
+    );
+};
+
+const setCloudConfigEmpty = async (hwid) => {
+    if (usePg) {
+        return await pgPool.query(
+            'UPDATE cloud_configs SET config = $2, config_size = 2, updated_at = NOW() WHERE hwid = $1',
+            [hwid, '{}']
+        );
+    }
+    return await db.run(
+        'UPDATE cloud_configs SET config = ?, config_size = 2, updated_at = CURRENT_TIMESTAMP WHERE hwid = ?',
+        '{}', hwid
+    );
+};
+
+const deleteCloudConfig = async (hwid) => {
+    if (usePg) {
+        return await pgPool.query('DELETE FROM cloud_configs WHERE hwid = $1', [hwid]);
+    }
+    return await db.run('DELETE FROM cloud_configs WHERE hwid = ?', hwid);
+};
+
+const listCloudConfigs = async () => {
+    if (usePg) {
+        const r = await pgPool.query(`
+            SELECT hwid, pc_name, windows_user, ip, config_size,
+                   created_at, updated_at, last_seen
+            FROM cloud_configs
+            ORDER BY updated_at DESC`);
+        return r.rows;
+    }
+    return await db.all(`
+        SELECT hwid, pc_name, windows_user, ip, config_size,
+               created_at, updated_at, last_seen
+        FROM cloud_configs
+        ORDER BY updated_at DESC`);
+};
+
 module.exports = {
     initializeDatabase,
     getLicense,
@@ -501,5 +619,11 @@ module.exports = {
     getFrozenLicenses,
     getActiveLicenses,
     getAllLicenses,
-    logAdminAction
+    logAdminAction,
+    upsertCloudConfig,
+    getCloudConfig,
+    touchCloudConfig,
+    setCloudConfigEmpty,
+    deleteCloudConfig,
+    listCloudConfigs
 };
