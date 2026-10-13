@@ -932,12 +932,24 @@ async function updateStatsChannels() {
 // =================================
 //
 client.on('interactionCreate', async interaction => {
-    if (interaction.isChatInputCommand()) {
-        await handleSlashCommand(interaction);
-    } else if (interaction.isButton()) {
-        await handleButton(interaction);
-    } else if (interaction.isModalSubmit()) {
-        await handleModal(interaction);
+    try {
+        if (interaction.isChatInputCommand()) {
+            await handleSlashCommand(interaction);
+        } else if (interaction.isButton()) {
+            await handleButton(interaction);
+        } else if (interaction.isModalSubmit()) {
+            await handleModal(interaction);
+        }
+    } catch (err) {
+        console.error(`[INTERACTION-ERROR] id=${interaction.customId || interaction.commandName} von ${interaction.user ? interaction.user.tag : '?'}:`, err && err.stack ? err.stack : err);
+        try {
+            const msg = `⚠️ Fehler bei dieser Aktion: ${err && err.message ? err.message : err}`;
+            if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: msg, ephemeral: true });
+            } else if (interaction.isRepliable()) {
+                await interaction.followUp({ content: msg, ephemeral: true });
+            }
+        } catch (_) {}
     }
 });
 
