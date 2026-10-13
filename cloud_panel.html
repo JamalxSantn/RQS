@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Config Cloud · Panel</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #131722;
+    --panel-2: #1a2030;
+    --border: #232a3d;
+    --text: #dce3f1;
+    --muted: #8190ab;
+    --accent: #4f7cff;
+    --green: #2fd07a;
+    --red: #ff5f6b;
+    --yellow: #ffc44d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  .login-wrap {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 16px;
+  }
+  .login-card {
+    width: 100%; max-width: 360px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 32px 28px;
+  }
+  .login-card h1 { font-size: 20px; margin-bottom: 4px; }
+  .login-card p { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
+  .login-card input {
+    width: 100%; padding: 12px 14px; margin-bottom: 14px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-size: 14px; outline: none;
+  }
+  .login-card input:focus { border-color: var(--accent); }
+  button {
+    border: none; border-radius: 8px; cursor: pointer; font-size: 14px;
+    font-weight: 600; padding: 11px 16px; transition: filter .15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; width: 100%; }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); padding: 7px 12px; font-size: 13px; font-weight: 500; }
+  .btn-ghost:hover { border-color: var(--accent); color: #fff; }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-warn { background: var(--yellow); color: #1a1a1a; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 24px; border-bottom: 1px solid var(--border);
+    background: var(--panel); position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 17px; display: flex; align-items: center; gap: 10px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); display: inline-block; }
+  header .actions { display: flex; gap: 10px; align-items: center; }
+  .search {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 9px 12px; color: var(--text); width: 220px; font-size: 13px; outline: none;
+  }
+  .search:focus { border-color: var(--accent); }
+
+  main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px; margin-bottom: 22px;
+  }
+  .stat {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .stat .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  .stat .value { font-size: 26px; font-weight: 700; margin-top: 4px; }
+
+  .table-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: left; padding: 12px 16px; color: var(--muted); font-weight: 600;
+    font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+    border-bottom: 1px solid var(--border); background: var(--panel-2);
+    white-space: nowrap;
+  }
+  tbody td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:hover { background: rgba(79,124,255,.06); }
+  tbody tr:last-child td { border-bottom: none; }
+  .badge {
+    display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700;
+  }
+  .badge-new { background: rgba(47,208,122,.15); color: var(--green); }
+  .badge-muted { background: rgba(129,144,171,.15); color: var(--muted); }
+  code {
+    font-family: "Cascadia Code", Consolas, monospace; font-size: 12px;
+    background: var(--panel-2); padding: 2px 7px; border-radius: 5px; color: #a9bfff;
+  }
+  .empty {
+    text-align: center; color: var(--muted); padding: 40px 0; font-size: 14px;
+  }
+  .mono { font-family: "Cascadia Code", Consolas, monospace; }
+  .spark { display: inline-flex; gap: 3px; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6);
+    display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    width: 100%; max-width: 760px; max-height: 82vh; display: flex; flex-direction: column;
+  }
+  .modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+  }
+  .modal-head h3 { font-size: 15px; }
+  .modal-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+  .modal-body { padding: 20px; overflow: auto; }
+  .modal-body pre {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px; font-size: 12px; overflow: auto; color: #b7c5e3;
+    max-height: 420px; white-space: pre-wrap; word-break: break-word;
+  }
+  .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .meta-item .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .meta-item .v { font-size: 13px; margin-top: 3px; }
+
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    padding: 12px 20px; border-radius: 10px; font-size: 13px; opacity: 0; transition: all .25s;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.ok { border-color: var(--green); }
+  .toast.err { border-color: var(--red); }
+  .muted { color: var(--muted); }
+  @media (max-width: 640px) {
+    .search { width: 100%; }
+    header { flex-wrap: wrap; gap: 12px; }
+    main { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loginView" class="login-wrap">
+  <div class="login-card">
+    <h1>Config Cloud</h1>
+    <p>Melde dich mit dem Login-Code aus Discord an.</p>
+    <input id="code" type="text" placeholder="Login-Code (z.B. K7M2QP)" maxlength="12" style="text-transform:uppercase;letter-spacing:2px;font-weight:600" autocomplete="off">
+    <button class="btn-primary" onclick="doLogin()">Anmelden</button>
+    <div style="text-align:center;margin:16px 0 12px;color:var(--muted);font-size:12px">oder Admin-Passwort</div>
+    <input id="pw" type="password" placeholder="Admin-Passwort" autocomplete="current-password">
+    <button class="btn-ghost" style="width:100%" onclick="doPwLogin()">Mit Passwort anmelden</button>
+  </div>
+</div>
+
+<div id="appView" style="display:none">
+  <header>
+    <h1><span class="dot"></span> Config Cloud · Panel</h1>
+    <div class="actions">
+      <span id="whoami" class="muted" style="font-size:13px"></span>
+      <input id="search" class="search" placeholder="Suchen (HWID / PC / User)" oninput="render()">
+      <button class="btn-ghost" onclick="loadConfigs()">Aktualisieren</button>
+      <button class="btn-ghost" onclick="logout()">Logout</button>
+    </div>
+  </header>
+  <main>
+    <div class="stats">
+      <div class="stat"><div class="label">Configs</div><div class="value" id="statTotal">–</div></div>
+      <div class="stat"><div class="label">Neu (10 min)</div><div class="value" id="statNew">–</div></div>
+      <div class="stat"><div class="label">Letzte Aktualisierung</div><div class="value" id="statLast" style="font-size:15px;line-height:34px">–</div></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>HWID</th><th>PC</th><th>Windows-User</th><th>IP</th><th>Größe</th><th>Zuletzt gesehen</th><th>Neu</th><th style="text-align:right">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div id="empty" class="empty" style="display:none">Keine Configs vorhanden.</div>
+    </div>
+  </main>
+</div>
+
+<div id="detailModal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-head"><h3>Config Details</h3><button class="modal-close" onclick="closeDetail()">✕</button></div>
+    <div class="modal-body">
+      <div class="meta-grid" id="detailMeta"></div>
+      <pre id="detailJson"></pre>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+let token = localStorage.getItem('cc_token') || '';
+let configs = [];
+let timer = null;
+
+const $ = id => document.getElementById(id);
+
+function toast(msg, ok = true) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (ok ? 'ok' : 'err');
+  setTimeout(() => { t.className = 'toast'; }, 2600);
+}
+
+async function api(path, opts = {}) {
+  opts.headers = Object.assign({}, opts.headers, { 'x-admin-token': token });
+  if (opts.body && typeof opts.body !== 'string') {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(opts.body);
+  }
+  const r = await fetch(path, opts);
+  if (r.status === 401) { logout(true); throw new Error('unauthorized'); }
+  return r.json();
+}
+
+function fmtTime(v) {
+  if (!v) return '–';
+  const d = new Date(v);
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 60000) return 'gerade eben';
+  const m = Math.floor(diff / 60000);
+  if (m < 60) return `vor ${m} Min.`;
+  const h = Math.floor(diff / 3600000);
+  if (h < 24) return `vor ${h} Std.`;
+  return d.toLocaleDateString('de-DE') + ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+function sizeStr(n) {
+  if (!n) return '0 B';
+  if (n < 1024) return n + ' B';
+  return (n / 1024).toFixed(1) + ' KB';
+}
+
+function render() {
+  const q = ($('search').value || '').toLowerCase();
+  const list = configs.filter(c =>
+    !q || (c.hwid||'').toLowerCase().includes(q) || (c.pcName||'').toLowerCase().includes(q) || (c.windowsUser||'').toLowerCase().includes(q));
+  $('statTotal').textContent = configs.length;
+  $('statNew').textContent = configs.filter(c => c.isNew).length;
+  $('statLast').textContent = new Date().toLocaleTimeString('de-DE');
+  const rows = $('rows');
+  rows.innerHTML = '';
+  $('empty').style.display = list.length ? 'none' : 'block';
+  for (const c of list) {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><code>' + (c.hwid || '').replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</code></td>' +
+      '<td>' + esc(c.pcName) + '</td>' +
+      '<td>' + esc(c.windowsUser) + '</td>' +
+      '<td class="mono muted">' + esc(c.ip || '–') + '</td>' +
+      '<td>' + sizeStr(c.configSize) + '</td>' +
+      '<td class="muted">' + fmtTime(c.lastSeen || c.updatedAt) + '</td>' +
+      '<td>' + (c.isNew ? '<span class="badge badge-new">NEU</span>' : '<span class="badge badge-muted">ok</span>') + '</td>' +
+      '<td style="text-align:right;white-space:nowrap">' +
+        '<button class="btn-ghost" onclick="showDetail(\'' + c.hwid + '\')">Ansehen</button> ' +
+        '<button class="btn-ghost" onclick="resetConfig(\'' + c.hwid + '\')" title="Config leeren">Reset</button> ' +
+        '<button class="btn-ghost" onmouseenter="this.classList.add(\'btn-warn\')" onmouseleave="this.classList.remove(\'btn-warn\')" onclick="delConfig(\'' + c.hwid + '\')">Löschen</button>' +
+      '</td>';
+    rows.appendChild(tr);
+  }
+}
+
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function loadConfigs() {
+  try {
+    const j = await api('/admin/configs');
+    if (j.success) { configs = j.configs || []; render(); }
+  } catch (e) {}
+}
+
+async function showDetail(hwid) {
+  try {
+    const j = await api('/admin/configs/' + hwid);
+    if (!j.success) { toast('Konnte Details nicht laden', false); return; }
+    const e = j.entry;
+    $('detailMeta').innerHTML =
+      '<div class="meta-item"><div class="k">HWID</div><div class="v"><code>' + esc(hwid) + '</code></div></div>' +
+      '<div class="meta-item"><div class="k">PC</div><div class="v">' + esc(e.pcName||'–') + '</div></div>' +
+      '<div class="meta-item"><div class="k">Windows-User</div><div class="v">' + esc(e.windowsUser||'–') + '</div></div>' +
+      '<div class="meta-item"><div class="k">IP</div><div class="v">' + esc(e.ip||'–') + '</div></div>' +
+      '<div class="meta-item"><div class="k">Größe</div><div class="v">' + sizeStr(e.configSize) + '</div></div>' +
+      '<div class="meta-item"><div class="k">Erstellt</div><div class="v">' + fmtTime(e.createdAt) + '</div></div>' +
+      '<div class="meta-item"><div class="k">Aktualisiert</div><div class="v">' + fmtTime(e.updatedAt) + '</div></div>';
+    $('detailJson').textContent = JSON.stringify(e.config, null, 2);
+    $('detailModal').classList.add('open');
+  } catch (e) {}
+}
+
+function closeDetail() { $('detailModal').classList.remove('open'); }
+
+async function resetConfig(hwid) {
+  if (!confirm('Config von ' + hwid + ' wirklich zurücksetzen?\nDer Cheat lädt danach wieder Defaults.')) return;
+  try {
+    const j = await api('/admin/configs/' + hwid + '/reset', { method: 'POST' });
+    j.success ? toast('Config zurückgesetzt') : toast('Fehler', false);
+    loadConfigs();
+  } catch (e) {}
+}
+
+async function delConfig(hwid) {
+  if (!confirm('Config von ' + hwid + ' wirklich löschen?')) return;
+  try {
+    const j = await api('/admin/configs/' + hwid, { method: 'DELETE' });
+    j.success ? toast('Config gelöscht') : toast('Fehler', false);
+    loadConfigs();
+  } catch (e) {}
+}
+
+async function doLogin() {
+  const code = ($('code').value || '').trim().toUpperCase();
+  if (!code) { toast('Bitte Login-Code eingeben', false); return; }
+  await attemptLogin('/admin/login-code', { code });
+}
+
+async function doPwLogin() {
+  const password = ($('pw').value || '').trim();
+  if (!password) { toast('Bitte Passwort eingeben', false); return; }
+  await attemptLogin('/admin/login', { password });
+}
+
+async function attemptLogin(endpoint, body) {
+  try {
+    const r = await fetch(endpoint, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const j = await r.json();
+    if (j.success) {
+      token = j.token; localStorage.setItem('cc_token', token);
+      if (j.admin) localStorage.setItem('cc_admin', j.admin);
+      showApp();
+    } else {
+      toast(j.error === 'code expired' ? 'Code abgelaufen' : (endpoint.endsWith('code') ? 'Ungültiger Code' : 'Falsches Passwort'), false);
+    }
+  } catch (e) {
+    toast('Verbindungsfehler', false);
+  }
+}
+
+function logout(silent) {
+  token = ''; localStorage.removeItem('cc_token'); localStorage.removeItem('cc_admin');
+  $('appView').style.display = 'none';
+  $('loginView').style.display = 'flex';
+  $('pw').value = ''; $('code').value = '';
+  if (!silent) toast('Abgemeldet');
+}
+
+function showApp() {
+  $('loginView').style.display = 'none';
+  $('appView').style.display = 'block';
+  const admin = localStorage.getItem('cc_admin');
+  $('whoami').textContent = admin ? ('👤 ' + admin) : '';
+  loadConfigs();
+  if (!timer) timer = setInterval(loadConfigs, 10000);
+}
+
+(function init() {
+  if (token) {
+    fetch('/admin/configs', { headers: { 'x-admin-token': token } })
+      .then(r => { if (r.ok) showApp(); else logout(true); })
+      .catch(() => logout(true));
+  }
+  $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') doPwLogin(); });
+  $('code').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  $('detailModal').addEventListener('click', e => { if (e.target === $('detailModal')) closeDetail(); });
+})();
+</script>
+</body>
+</html>

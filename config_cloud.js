@@ -6,8 +6,9 @@
 //   Cheat (no auth):
 //     POST /cloud/export  { hwid, config, pcName, windowsUser }
 //     GET  /cloud/import?hwid=XXX
-//   Admin (Header x-admin-token: <ADMIN_PASSWORD>):
-//     POST /admin/login { password }
+//   Admin:
+//     POST /admin/login { password }              -> Passwort-Login
+//     POST /admin/login-code { code }             -> Discord-Einmal-Code-Login
 //     GET  /admin/configs
 //     GET  /admin/configs/:hwid
 //     DELETE /admin/configs/:hwid
@@ -18,9 +19,13 @@
 // damit Configs auch nach einem Render-Redeploy erhalten bleiben.
 //
 // Mounted from index.js:
-//   require('./config_cloud.js')({ app, db });
+//   require('./config_cloud.js')({ app, db, loginCodes });
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || process.env.CLOUD_ADMIN_PASSWORD || 'Rayx123';
+
+// Vom Bot befüllte Einmal-Codes (Map: code -> { expires, adminTag }).
+let loginCodes = new Map();
+const LOGIN_CODE_TTL_MS = 5 * 60 * 1000;
 
 const safeHwid = (h) => {
     if (typeof h !== 'string') return '';
@@ -47,7 +52,9 @@ const isAdmin = (req) => {
     return t === ADMIN_PASSWORD || bearer === ADMIN_PASSWORD;
 };
 
-function registerCloudRoutes({ app, db }) {
+function registerCloudRoutes({ app, db, loginCodes: sharedLoginCodes }) {
+    if (sharedLoginCodes) loginCodes = sharedLoginCodes;
+
     // ---------- CHEAT: EXPORT ----------
     app.post('/cloud/export', async (req, res) => {
         const body = req.body || {};
@@ -108,6 +115,21 @@ function registerCloudRoutes({ app, db }) {
             return res.json({ success: true, token: ADMIN_PASSWORD });
         }
         return res.status(401).json({ success: false, error: 'wrong password' });
+    });
+
+    // ---------- ADMIN: DISCORD-EINMAL-CODE-LOGIN ----------
+    app.post('/admin/login-code', (req, res) => {
+        const body = req.body || {};
+        const code = String(body.code || '').trim().toUpperCase();
+        const entry = loginCodes.get(code);
+        if (!entry) return res.status(401).json({ success: false, error: 'invalid code' });
+        if (Date.now() > entry.expires) {
+            loginCodes.delete(code);
+            return res.status(401).json({ success: false, error: 'code expired' });
+        }
+        loginCodes.delete(code);
+        console.log(`[CONFIG-LOGIN] ${entry.adminTag} per Discord-Code`);
+        return res.json({ success: true, token: ADMIN_PASSWORD, admin: entry.adminTag });
     });
 
     // ---------- ADMIN: LIST ----------
@@ -189,24 +211,9 @@ function registerCloudRoutes({ app, db }) {
         res.json({ success: true });
     });
 
-    // ---------- Admin-Panel (minimal, inline CSS/JS) ----------
+    // ---------- Admin-Panel (separate HTML-Datei) ----------
     app.get('/cloud/panel', (req, res) => {
-        res.status(401).send(
-            '<h2>Admin Panel</h2>' +
-            '<form id="f"><input id="p" type="password" placeholder="Passwort"><button>Login</button></form>' +
-            '<pre id="out">Bitte einloggen.</pre>' +
-            '<script>' +
-            'const f=document.getElementById("f"),p=document.getElementById("p"),out=document.getElementById("out");' +
-            'let token=localStorage.getItem("cc_token")||"";' +
-            'async function show(){if(!token){out.textContent="Nicht eingeloggt.";return;}' +
-            'const r=await fetch("/admin/configs",{headers:{"x-admin-token":token}});' +
-            'if(r.status===401){token="";localStorage.removeItem("cc_token");out.textContent="Session abgelaufen.";return;}' +
-            'const j=await r.json();out.textContent=JSON.stringify(j,null,2);}' +
-            'f.onsubmit=async(e)=>{e.preventDefault();const r=await fetch("/admin/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p.value})});' +
-            'const j=await r.json();if(j.success){token=j.token;localStorage.setItem("cc_token",token);show();}else{out.textContent="Falsches Passwort.";}};' +
-            'show();' +
-            '</script>'
-        );
+        res.sendFile(require('path').join(__dirname, 'cloud_panel.html'));
     });
 }
 

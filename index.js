@@ -160,6 +160,25 @@ async function getCountryFromIP(ip) {
 // =================================
 const bootTime = Date.now();
 
+// Einmal-Login-Codes fuer das Config-Cloud-Web-Panel (Discord-Login).
+const cloudLoginCodes = new Map();
+const CLOUD_PANEL_URL = process.env.CLOUD_PANEL_URL || 'https://rqs-0trt.onrender.com/cloud/panel';
+const CLOUD_PANEL_CHANNEL_ID = process.env.CLOUD_PANEL_CHANNEL_ID || config.cloudPanelChannelId || '1558887050072162374';
+const CLOUD_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function makeCloudCode() {
+    let code = '';
+    for (let i = 0; i < 6; i++) code += CLOUD_CODE_ALPHABET[Math.floor(Math.random() * CLOUD_CODE_ALPHABET.length)];
+    return code;
+}
+
+// Abgelaufene Codes regelmaessig entfernen.
+setInterval(() => {
+    const now = Date.now();
+    for (const [code, entry] of cloudLoginCodes) if (now > entry.expires) cloudLoginCodes.delete(code);
+}, 60 * 1000).unref?.();
+
+
 const LOG_CHANNEL_NAMES = {
     all: 'all-logs',
     key: 'key',
@@ -397,6 +416,7 @@ client.once('ready', async () => {
     await sendUserPanel();
     await sendStaticHeaders();
     await sendBotPanel();
+    await sendCloudPanel();
     setInterval(updateBotPanel, 60 * 1000);
 });
 
@@ -723,6 +743,46 @@ async function updateBotPanel() {
         if (msg) await msg.edit({ embeds: [buildBotEmbed()], components: [botRestartRow()] }).catch(() => {});
         else await sendBotPanel();
     } catch (e) { console.error('updateBotPanel:', e.message); }
+}
+
+// =================================
+//
+// Config-Cloud Panel (Discord-Login fuer die Website)
+//
+// =================================
+function buildCloudPanelEmbed() {
+    return new EmbedBuilder()
+        .setTitle('🔐 Config Cloud · Website-Login')
+        .setDescription(
+            '> Hier kannst du dich für das **Config-Cloud Panel** anmelden.\n' +
+            '> Klicke auf **Login**, um einen einmaligen Code zu erhalten.\n' +
+            '> Gib den Code anschließend auf der Website ein.'
+        )
+        .addFields(
+            { name: '🌐 Website', value: CLOUD_PANEL_URL, inline: false },
+            { name: '⏱️ Gültigkeit', value: '> Der Code ist **5 Minuten** gültig.', inline: false }
+        )
+        .setColor('#5865F2')
+        .setFooter({ text: 'REQUST' })
+        .setTimestamp();
+}
+
+function cloudLoginRow() {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('cloud_panel_login').setLabel('Login').setStyle(ButtonStyle.Primary)
+    );
+}
+
+async function sendCloudPanel() {
+    const channel = await client.channels.fetch(CLOUD_PANEL_CHANNEL_ID).catch(() => null);
+    if (!channel || !channel.isTextBased || !channel.isTextBased()) {
+        console.log(`Config-Cloud Panel-Channel (${CLOUD_PANEL_CHANNEL_ID}) nicht gefunden.`);
+        return;
+    }
+    try {
+        await channel.send({ embeds: [buildCloudPanelEmbed()], components: [cloudLoginRow()] });
+        console.log('Config-Cloud panel has been sent.');
+    } catch (e) { console.error('Error sending cloud panel:', e.message); }
 }
 
 // =================================
@@ -1275,6 +1335,20 @@ async function showSingleLicense(interaction, licenseKey) {
 
 // Handle pagination buttons
 async function handleButton(interaction) {
+    // ---- Config-Cloud Website-Login ----
+    if (interaction.customId === 'cloud_panel_login') {
+        if (!hasPriv(interaction.member, config.adminRoleId)) {
+            return interaction.reply({ content: "You don't have permission to log in to the panel.", ephemeral: true });
+        }
+        const code = makeCloudCode();
+        cloudLoginCodes.set(code, { expires: Date.now() + 5 * 60 * 1000, adminTag: interaction.user.tag });
+        console.log(`[CONFIG-CODE] ${code} generiert fuer ${interaction.user.tag}`);
+        return interaction.reply({
+            content: `🔐 **Dein Login-Code:** \`${code}\`\n> Gültig **5 Minuten**. Gib ihn auf der Website ein: ${CLOUD_PANEL_URL}`,
+            ephemeral: true
+        });
+    }
+
     // ---- Bot Restart (#bot Panel) ----
     if (interaction.customId === 'bot_restart') {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
@@ -2274,7 +2348,7 @@ app.post('/api/log-failed-login', async (req, res) => {
 require('./chat_party.js')({ app, db, client, config, planOfLicense, formatExpiry });
 
 // Config Cloud (Sicherung der Cheat-Einstellungen in der DB, statt separatem Server).
-require('./config_cloud.js')({ app, db });
+require('./config_cloud.js')({ app, db, loginCodes: cloudLoginCodes });
 
 const listenPort = process.env.PORT ? Number(process.env.PORT) : config.apiPort;
 app.listen(listenPort, () => {
