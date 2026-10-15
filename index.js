@@ -2215,7 +2215,7 @@ app.post('/api/login', async (req, res) => {
         await sendLog('login', { embeds: [embed] });
     }
 
-    return res.json({ status: "success", action: "login", data: { discord_name: discordName, discord_id: license.linked_discord_id || null, product: license.product, expires_at: license.expires_at, expires_text: formatExpiry(license.expires_at), plan_label: planOfLicense(license) } });
+    return res.json({ status: "success", action: "login", data: { discord_name: discordName, avatar_url: user ? user.displayAvatarURL({ extension: "png", size: 128 }) : null, discord_id: license.linked_discord_id || null, product: license.product, expires_at: license.expires_at, expires_text: formatExpiry(license.expires_at), plan_label: planOfLicense(license) } });
 });
 
 app.post('/api/login-discord', async (req, res) => {
@@ -2249,7 +2249,7 @@ app.post('/api/login-discord', async (req, res) => {
             await sendLog('login', { embeds: [embed] });
         }
 
-        return res.json({ status: "success", action: "login", data: { discord_name: discordName, discord_id: license.linked_discord_id || null, product: license.product, expires_at: license.expires_at, expires_text: formatExpiry(license.expires_at), plan_label: planOfLicense(license) } });
+        return res.json({ status: "success", action: "login", data: { discord_name: discordName, avatar_url: user ? user.displayAvatarURL({ extension: "png", size: 128 }) : null, discord_id: license.linked_discord_id || null, product: license.product, expires_at: license.expires_at, expires_text: formatExpiry(license.expires_at), plan_label: planOfLicense(license) } });
     } catch (error) {
         console.error('Error in discord login:', error);
         return res.status(500).json({ status: "error", message: "Internal server error." });
@@ -2301,7 +2301,7 @@ const embed = new EmbedBuilder().setTitle("Login").setColor("Purple")
     await sendLog('login', { embeds: [embed] });
 
     const user = await client.users.fetch(deviceInfo.discordId).catch(() => null);
-    return res.json({ status: "success", action: "login", data: { discord_name: user ? user.username : "Unknown", discord_id: deviceInfo.discordId, product: license.product, expires_at: license.expires_at, expires_text: formatExpiry(license.expires_at), plan_label: planOfLicense(license) } });
+    return res.json({ status: "success", action: "login", data: { discord_name: user ? user.username : "Unknown", avatar_url: user ? user.displayAvatarURL({ extension: "png", size: 128 }) : null, discord_id: deviceInfo.discordId, product: license.product, expires_at: license.expires_at, expires_text: formatExpiry(license.expires_at), plan_label: planOfLicense(license) } });
 });
 
 app.post('/api/inject', async (req, res) => {
