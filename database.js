@@ -5,6 +5,19 @@ const { open } = require('sqlite');
 // Ohne -> lokales SQLite (wie bisher).
 const usePg = !!process.env.DATABASE_URL;
 
+// Auf Cloud-Hostern (z. B. Render) ist die Festplatte fluechtig: ohne
+// DATABASE_URL wird SQLite benutzt und Aenderungen (z. B. geloeschte Keys)
+// werden bei jedem Neustart zurueckgesetzt. Darum deutlich warnen.
+if (!usePg && (process.env.RENDER || process.env.RENDER_SERVICE_ID || process.env.NODE_ENV === 'production')) {
+    console.warn('====================================================');
+    console.warn(' WARNUNG: DATABASE_URL ist NICHT gesetzt!');
+    console.warn(' Es wird fluechtiges SQLite benutzt -> geloeschte Keys');
+    console.warn(' kommen nach jedem Neustart zurueck.');
+    console.warn(' Bitte DATABASE_URL (Neon/Postgres) in den Env-Variablen');
+    console.warn(' des Hosters setzen.');
+    console.warn('====================================================');
+}
+
 let db = null;     // sqlite
 let pgPool = null; // postgres
 
@@ -176,9 +189,14 @@ const getLicense = async (licenseKey) => {
 };
 
 const deleteLicenseDB = async (licenseKey) => {
+    // user_sessions hat einen Foreign Key auf licenses (ohne ON DELETE CASCADE).
+    // Erst die abhaengigen Sitzungen loeschen, sonst schlaegt das Loeschen auf
+    // Postgres fehl und der Key "kommt nach dem Neustart wieder".
     if (usePg) {
+        await pgPool.query('DELETE FROM user_sessions WHERE license_key = $1', [licenseKey]);
         return await pgPool.query('DELETE FROM licenses WHERE license_key = $1', [licenseKey]);
     }
+    await db.run('DELETE FROM user_sessions WHERE license_key = ?', licenseKey);
     return await db.run('DELETE FROM licenses WHERE license_key = ?', licenseKey);
 };
 

@@ -418,6 +418,10 @@ client.once('ready', async () => {
     await sendBotPanel();
     await sendCloudPanel();
     setInterval(updateBotPanel, 60 * 1000);
+
+    // Key-List Embed alle 5 Minuten neu aufbauen + senden/aktualisieren,
+    // damit geloeschte/erstellte/benutzte Keys sofort verschwinden bzw. auftauchen.
+    setInterval(() => { refreshKeyListPanel().catch(() => {}); }, 5 * 60 * 1000);
 });
 
 // =================================
@@ -1712,7 +1716,8 @@ async function handleModal(interaction) {
     }
 
     if (interaction.customId === 'delete_license_modal') {
-        const licenseKey = interaction.fields.getTextInputValue('license_key');
+        const raw = interaction.fields.getTextInputValue('license_key') || '';
+        const licenseKey = raw.trim().replace(/^\|\|/, '').replace(/\|\|$/, '').replace(/^`+|`+$/g, '').trim();
         const license = await db.getLicense(licenseKey);
         if (!license) return interaction.editReply({ content: "No key found to delete." });
 
