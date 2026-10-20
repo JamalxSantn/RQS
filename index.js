@@ -550,7 +550,7 @@ async function buildKeyListPage(page = 0, sortType = SORT_TYPES.DEFAULT) {
     const embed = new EmbedBuilder()
         .setTitle(`📋 Key List (Page ${safePage + 1}/${totalPages})`)
         .setColor('Blue')
-        .setFooter({ text: `Sorting: ${SORT_DISPLAY_NAMES[sortType]} · Total: ${sortedLicenses.length}` })
+        .setFooter({ text: `Total: ${sortedLicenses.length}` })
         .setTimestamp();
 
     currentLicenses.forEach((license, index) => {
@@ -575,10 +575,6 @@ async function buildKeyListPage(page = 0, sortType = SORT_TYPES.DEFAULT) {
                 .setLabel('◀')
                 .setStyle(ButtonStyle.Primary)
                 .setDisabled(safePage === 0),
-            new ButtonBuilder()
-                .setCustomId(`licenses_sort_${sortType}`)
-                .setLabel(`Sort by: ${SORT_DISPLAY_NAMES[sortType]}`)
-                .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`licenses_next_${safePage}_${sortType}`)
                 .setLabel('▶')
