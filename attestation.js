@@ -20,7 +20,7 @@
 //
 // Env:
 //   ATTEST_SECRET    shared secret (must match ClientSecret() in Attestation.hpp)
-//   ATTEST_VERSIONS  comma separated allowed client versions (default 1.0.0)
+//   ATTEST_VERSIONS  comma separated allowed client versions (default 1.0.1)
 //   ATTEST_REVOKED   comma separated HWIDs that are refused with stop:true
 //   ATTEST_EXPECTED_INTEGRITY  optional "version:digest" pairs (digest decimal,
 //                    use * for all versions); when set, a different digest is
@@ -33,7 +33,7 @@
 const crypto = require('crypto');
 
 const DEFAULT_SECRET = 'af8affc6172898f1e9f24118e4fc8ee0c127e55fd42cb41db622aaeb98936779';
-const DEFAULT_VERSION = '1.0.0';
+const DEFAULT_VERSION = '1.0.1';
 
 const CHALLENGE_TTL_MS = 30 * 1000;
 const TOKEN_TTL_MS = 15 * 60 * 1000;
@@ -66,7 +66,7 @@ module.exports = function registerAttestation({ app, db }) {
     if (!app) throw new Error('attestation: app is required');
 
     const secret = process.env.ATTEST_SECRET || DEFAULT_SECRET;
-    const versions = new Set(listFromEnv('ATTEST_VERSIONS').length ? listFromEnv('ATTEST_VERSIONS') : [DEFAULT_VERSION]);
+    const versions = new Set([DEFAULT_VERSION, ...listFromEnv('ATTEST_VERSIONS')]);
     const revoked = new Set(listFromEnv('ATTEST_REVOKED').map((h) => h.toUpperCase()));
     const stopOnDebug = process.env.ATTEST_ALLOW_DEBUG !== '1';
 
@@ -191,7 +191,7 @@ module.exports = function registerAttestation({ app, db }) {
             const expires = now + TOKEN_TTL_MS;
             sessions.set(token, { hwid, version, integrity: digest, expires });
 
-            console.log(`[ATTEST] ok hwid=${hwid} version=${version}${license.license ? ' licensed' : ''}`);
+            console.log(`[ATTEST] ok hwid=${hwid} version=${version} digest=${digest}${license.license ? ' licensed' : ''}`);
             return res.json({ success: true, token, expires });
         } catch (e) {
             console.error('[ATTEST] verify error:', e.message);
@@ -224,6 +224,6 @@ module.exports = function registerAttestation({ app, db }) {
     };
 
     app.locals.attestation = api;
-    console.log(`[ATTEST] mounted (versions: ${[...versions].join(', ')}, stopOnDebug: ${stopOnDebug})`);
+    console.log(`[ATTEST] mounted (versions: ${[...versions].join(', ')}, stopOnDebug: ${stopOnDebug}, integrityPins: ${expectedIntegrity.size})`);
     return api;
 };
