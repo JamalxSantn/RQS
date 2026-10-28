@@ -1244,7 +1244,13 @@ async function handleSlashCommand(interaction) {
 
     if (commandName === 'addtime') {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
+            if (interaction.deferred) {
+                return interaction.editReply({ content: "You don't have permission to use this command." });
+            }
             return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
+        }
+        if (interaction.deferred) {
+            try { await interaction.deleteReply(); } catch (e) {}
         }
 
         const modal = new ModalBuilder()
