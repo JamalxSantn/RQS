@@ -121,6 +121,7 @@ const client = new Client({
 
 client.on('error', (error) => {
     console.error('[DISCORD] Client error:', error && error.message ? error.message : error);
+    if (error && error.stack) console.error(error.stack);
 });
 
 client.on('warn', (warning) => {
@@ -132,9 +133,7 @@ client.on('shardError', (error) => {
 });
 
 client.on('debug', (info) => {
-    if (process.env.DEBUG_DISCORD || info.includes('Ready') || info.includes('Session') || info.includes('Heartbeat')) {
-        console.log('[DISCORD-DEBUG]', info);
-    }
+    console.log('[DISCORD-DEBUG]', info);
 });
 
 client.on('disconnect', (event) => {
@@ -147,8 +146,23 @@ client.on('reconnecting', () => {
 
 client.on('invalidated', () => {
     console.error('[DISCORD] Session invalidated, attempting to login again...');
-    isLoggingIn = false;
     startBot();
+});
+
+client.on('shardReady', (id) => {
+    console.log(`[DISCORD] Shard ${id} ready`);
+});
+
+client.on('shardDisconnect', (event, id) => {
+    console.log(`[DISCORD] Shard ${id} disconnected`, event?.code);
+});
+
+client.on('shardReconnecting', (id) => {
+    console.log(`[DISCORD] Shard ${id} reconnecting`);
+});
+
+client.on('shardResume', (replayed, id) => {
+    console.log(`[DISCORD] Shard ${id} resumed, replayed ${replayed} events`);
 });
 
 // =================================
