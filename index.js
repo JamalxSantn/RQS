@@ -2541,23 +2541,17 @@ app.listen(listenPort, '0.0.0.0', () => {
 
 let isLoggingIn = false;
 async function startBot() {
-    if (isLoggingIn) return;
-    isLoggingIn = true;
     console.log('[BOT] Starting bot login process...');
     console.log('[BOT] Token present:', !!botToken);
     console.log('[BOT] Token length:', botToken ? botToken.length : 0);
-    while (true) {
-        try {
-            console.log('[BOT] Attempting to login to Discord...');
-            await client.login(botToken);
-            console.log('[BOT] Login successful');
-            isLoggingIn = false;
-            return;
-        } catch (err) {
-            console.error('[BOT] Login failed, retrying in 15s:', err && err.message ? err.message : err);
-            console.error('[BOT] Error code:', err && err.code ? err.code : 'N/A');
-            await new Promise((r) => setTimeout(r, 15000));
-        }
+    try {
+        console.log('[BOT] Attempting to login to Discord...');
+        await client.login(botToken);
+        console.log('[BOT] Login call completed');
+    } catch (err) {
+        console.error('[BOT] Login failed:', err && err.message ? err.message : err);
+        console.error('[BOT] Error code:', err && err.code ? err.code : 'N/A');
+        setTimeout(() => startBot(), 20000);
     }
 }
 startBot();
