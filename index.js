@@ -1370,8 +1370,7 @@ async function showDetailedStats(interaction) {
         activityEmbed.setDescription(activityDescription);
 
         await interaction.editReply({ 
-            embeds: [mainEmbed, licenseEmbed, countryEmbed, activityEmbed],
-            ephemeral: true 
+            embeds: [mainEmbed, licenseEmbed, countryEmbed, activityEmbed]
         });
 
     } catch (error) {
