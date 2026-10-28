@@ -1085,6 +1085,9 @@ async function handleSlashCommand(interaction) {
 
     if (commandName === 'license-delete') {
         if (!hasPriv(interaction.member, config.deleteRoleId)) {
+            if (interaction.deferred) {
+                return interaction.editReply({ content: "You don't have permission to use this command." });
+            }
             return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
         }
 
