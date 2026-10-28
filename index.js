@@ -1109,11 +1109,17 @@ async function handleSlashCommand(interaction) {
 
     if (commandName === 'admin-hwid') {
         if (!hasPriv(interaction.member, config.adminHwidResetRoleId)) {
+            if (interaction.deferred) {
+                return interaction.editReply({ content: "You don't have permission to use this command." });
+            }
             return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
         }
 
         const modal = new ModalBuilder().setCustomId('admin_hwid_modal').setTitle('ADMIN: Reset HWID')
             .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('license_key').setLabel("Enter license key").setStyle(TextInputStyle.Short).setRequired(true)));
+        if (interaction.deferred) {
+            try { await interaction.deleteReply(); } catch (e) {}
+        }
         await interaction.showModal(modal);
     }
 
