@@ -454,6 +454,7 @@ const commands = [
 // =================================
 //
 client.once('ready', async () => {
+    console.log('[BOT] READY EVENT RECEIVED');
     try {
         console.log(`[BOT] Ready event fired! Logged in as ${client.user.tag} (${client.user.id})`);
         console.log(`[BOT] Connected to ${client.guilds.cache.size} guild(s)`);
