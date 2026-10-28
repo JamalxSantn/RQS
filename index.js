@@ -1148,7 +1148,11 @@ async function handleSlashCommand(interaction) {
             if (interaction.deferred) {
                 return interaction.editReply({ content: "You don't have permission to use this command." });
             }
-            return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
+            try {
+                return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
+            } catch (e) {
+                return interaction.editReply({ content: "You don't have permission to use this command." });
+            }
         }
 
         const licenseKey = interaction.options.getString('license');
