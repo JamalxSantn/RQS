@@ -93,6 +93,12 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('uncaughtException', (err) => {
     console.error('[PROCESS] Uncaught exception:', err);
     console.error(err.stack);
+    // Don't exit on Render, try to keep running
+    if (process.env.RENDER) {
+        console.log('[PROCESS] On Render - attempting to recover...');
+    } else {
+        process.exit(1);
+    }
 });
 
 // =================================
