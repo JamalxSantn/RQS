@@ -1022,30 +1022,10 @@ async function updateStatsChannels() {
 client.on('interactionCreate', async interaction => {
     try {
         if (interaction.isChatInputCommand()) {
-            // Defer for potentially slow commands
-            const heavy = ['licenses-check', 'stats', 'freeze', 'unfreeze', 'addtime', 'generate-license'];
-            if (heavy.includes(interaction.commandName) && !interaction.deferred && !interaction.replied) {
-                try {
-                    // Don't defer generate-license as it just shows buttons
-                    if (interaction.commandName === 'generate-license') {
-                        // will reply quickly
-                    } else {
-                        await interaction.deferReply({ ephemeral: true });
-                    }
-                } catch (e) {}
-            }
             await handleSlashCommand(interaction);
         } else if (interaction.isButton()) {
-            const fast = ['cloud_panel_login', 'bot_restart', 'user_check', 'gen_day', 'gen_month', 'gen_lifetime', 'delete_key', 'freeze_key', 'unfreeze_key', 'addtime_key', 'admin_hwid', 'admin_discord', 'reset_discord', 'reset_hwid', 'redeem_key_button'];
-            if (!fast.includes(interaction.customId) && !interaction.customId.startsWith('licenses_') && !interaction.deferred && !interaction.replied) {
-                // try to defer for safety
-                try { await interaction.deferReply({ ephemeral: true }); } catch (e) {}
-            }
             await handleButton(interaction);
         } else if (interaction.isModalSubmit()) {
-            if (!interaction.deferred && !interaction.replied) {
-                try { await interaction.deferReply({ ephemeral: true }); } catch (e) {}
-            }
             await handleModal(interaction);
         }
     } catch (err) {
