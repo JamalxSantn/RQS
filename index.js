@@ -2560,26 +2560,28 @@ app.listen(listenPort, '0.0.0.0', () => {
 });
 
 let isLoggingIn = false;
+let restartCount = 0;
 async function startBot() {
     console.log('[BOT] Starting bot login process...');
     console.log('[BOT] Token present:', !!botToken);
     console.log('[BOT] Token length:', botToken ? botToken.length : 0);
+    restartCount++;
+    console.log(`[BOT] Restart attempt #${restartCount}`);
     while (true) {
         try {
             console.log('[BOT] Attempting to login to Discord...');
             await client.login(botToken);
             console.log('[BOT] Login call returned - waiting for ready event');
-            // If not ready after 60 seconds, restart process
             setTimeout(() => {
                 if (!client.isReady()) {
                     console.log('[BOT] Not ready after timeout, exiting to restart...');
                     process.exit(1);
                 }
-            }, 60000);
+            }, 45000);
             break;
         } catch (err) {
-            console.error('[BOT] Login failed, retrying in 15s:', err && err.message ? err.message : err);
-            await new Promise(r => setTimeout(r, 15000));
+            console.error('[BOT] Login failed, retrying in 10s:', err && err.message ? err.message : err);
+            await new Promise(r => setTimeout(r, 10000));
         }
     }
 }
