@@ -1158,6 +1158,9 @@ async function handleSlashCommand(interaction) {
 
     if (commandName === 'stats') {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
+            if (interaction.deferred) {
+                return interaction.editReply({ content: "You don't have permission to use this command." });
+            }
             return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
         }
         await showDetailedStats(interaction);
