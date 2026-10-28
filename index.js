@@ -1100,6 +1100,10 @@ async function handleSlashCommand(interaction) {
         const modalId = commandName === 'reset-discord' ? 'reset_discord_modal' : 'reset_hwid_modal';
         const modal = new ModalBuilder().setCustomId(modalId).setTitle(`Reset ${commandName === 'reset-discord' ? 'Discord' : 'HWID'}`)
             .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('license_key').setLabel("Enter your license key").setStyle(TextInputStyle.Short).setRequired(true)));
+        // If deferred, need to delete reply first
+        if (interaction.deferred) {
+            try { await interaction.deleteReply(); } catch (e) {}
+        }
         await interaction.showModal(modal);
     }
 
