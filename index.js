@@ -11,21 +11,39 @@ const db = require('./database.js');
 let config;
 try {
     config = require('./config.json');
+    console.log('[CONFIG] Loaded from config.json');
 } catch (e) {
-    console.log('config.json nicht gefunden - nutze Umgebungsvariablen.');
+    console.log('[CONFIG] config.json nicht gefunden - nutze Umgebungsvariablen.');
     config = {
         botToken: process.env.BOT_TOKEN,
         guildId: process.env.GUILD_ID || '1557841343491866795',
-        apiPort: 3000,
+        adminRoleId: process.env.ADMIN_ROLE_ID,
+        deleteRoleId: process.env.DELETE_ROLE_ID,
+        customerRoleId: process.env.CUSTOMER_ROLE_ID,
+        adminHwidResetRoleId: process.env.ADMIN_HWID_RESET_ROLE_ID,
+        adminDiscordResetRoleId: process.env.ADMIN_DISCORD_RESET_ROLE_ID,
+        apiPort: process.env.PORT || 3000,
         enableStatsChannels: false,
         logChannels: {},
         chatUsers: { '1027571297514967140': 'OWNER' },
         voiceChannels: {}
     };
 }
+
+// Override with env vars if present
+if (process.env.BOT_TOKEN) config.botToken = process.env.BOT_TOKEN;
+if (process.env.GUILD_ID) config.guildId = process.env.GUILD_ID;
+if (process.env.ADMIN_ROLE_ID) config.adminRoleId = process.env.ADMIN_ROLE_ID;
+if (process.env.DELETE_ROLE_ID) config.deleteRoleId = process.env.DELETE_ROLE_ID;
+if (process.env.CUSTOMER_ROLE_ID) config.customerRoleId = process.env.CUSTOMER_ROLE_ID;
+if (process.env.ADMIN_HWID_RESET_ROLE_ID) config.adminHwidResetRoleId = process.env.ADMIN_HWID_RESET_ROLE_ID;
+if (process.env.ADMIN_DISCORD_RESET_ROLE_ID) config.adminDiscordResetRoleId = process.env.ADMIN_DISCORD_RESET_ROLE_ID;
+if (process.env.PORT) config.apiPort = process.env.PORT;
 const botToken = process.env.BOT_TOKEN || config.botToken;
-if (!botToken || botToken === 'PASTE_YOUR_BOT_TOKEN_HERE') {
+console.log('[BOT] Token source:', process.env.BOT_TOKEN ? 'env' : 'config');
+if (!botToken || botToken === 'PASTE_YOUR_BOT_TOKEN_HERE' || botToken.trim() === '') {
     console.error('[FEHLER] Kein Bot-Token gesetzt. BOT_TOKEN Umgebungsvariable oder config.json pruefen.');
+    console.error('[DEBUG] process.env.BOT_TOKEN exists:', !!process.env.BOT_TOKEN);
     process.exit(1);
 }
 const axios = require('axios');
@@ -33,6 +51,11 @@ const axios = require('axios');
 // Single-Instance-Lock: Eine zweite Instanz beendet sich sofort,
 // damit Panels/Logs niemals doppelt gepostet werden.
 (function ensureSingleInstance() {
+    // Skip lock on Render/cloud environments to avoid issues
+    if (process.env.RENDER || process.env.RENDER_SERVICE_ID) {
+        console.log('[LOCK] Skipping single-instance lock on Render');
+        return;
+    }
     const fs = require('fs');
     const path = require('path');
     const lockPath = path.join(__dirname, 'bot.lock');
@@ -64,11 +87,12 @@ const axios = require('axios');
     process.on('SIGTERM', () => process.exit(0));
 })();
 
-process.on('unhandledRejection', (reason) => {
-    console.error('Unhandled rejection:', reason);
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[PROCESS] Unhandled rejection at:', promise, 'reason:', reason);
 });
 process.on('uncaughtException', (err) => {
-    console.error('Uncaught exception:', err);
+    console.error('[PROCESS] Uncaught exception:', err);
+    console.error(err.stack);
 });
 
 // =================================
@@ -83,9 +107,35 @@ const client = new Client({
         GatewayIntentBits.GuildMembers, 
         GatewayIntentBits.GuildMessages, 
         GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildVoiceStates
     ],
-    partials: [Partials.Channel, Partials.Message]
+    partials: [Partials.Channel, Partials.Message, Partials.User, Partials.GuildMember]
+});
+
+client.on('error', (error) => {
+    console.error('[DISCORD] Client error:', error);
+});
+
+client.on('warn', (warning) => {
+    console.warn('[DISCORD] Client warning:', warning);
+});
+
+client.on('shardError', (error) => {
+    console.error('[DISCORD] Shard error:', error);
+});
+
+client.on('disconnect', (event) => {
+    console.log('[DISCORD] Client disconnected', event);
+});
+
+client.on('reconnecting', () => {
+    console.log('[DISCORD] Client reconnecting...');
+});
+
+client.on('invalidated', () => {
+    console.error('[DISCORD] Session invalidated, attempting to login again...');
+    startBot();
 });
 
 // =================================
@@ -377,51 +427,76 @@ const commands = [
 // =================================
 //
 client.once('ready', async () => {
-    console.log(`Bot logged in as ${client.user.tag}!`);
-    await db.initializeDatabase();
-
-    const rest = new REST({ version: '10' }).setToken(botToken);
     try {
-        console.log('Started refreshing application (/) commands.');
-        await rest.put(
-            Routes.applicationGuildCommands(client.user.id, config.guildId),
-            { body: commands },
-        );
-        console.log('Successfully reloaded application (/) commands.');
-    } catch (error) {
-        console.error(error);
-    }
-
-    await resolveLogChannels();
-
-    // Neustart = alle Logs loeschen - ausser Archiv-Channels (bleiben erhalten).
-    const keepOnRestart = new Set(['all', 'login', 'inject']);
-    for (const key of Object.keys(LOG_CHANNEL_NAMES)) {
-        if (keepOnRestart.has(key)) continue;
-        const ch = getLogChannel(key);
-        if (!ch) continue;
+        console.log(`[BOT] Ready event fired! Logged in as ${client.user.tag} (${client.user.id})`);
+        console.log(`[BOT] Connected to ${client.guilds.cache.size} guild(s)`);
+        console.log(`[BOT] Guild ID from config: ${config.guildId}`);
+        if (!client.guilds.cache.has(config.guildId)) {
+            console.error(`[BOT] WARNING: Config guildId ${config.guildId} not found in guild cache!`);
+        }
         try {
-            const n = await purgeChannel(ch);
-            console.log(`[OK] #${ch.name} geleert (${n} Nachrichten).`);
-        } catch (e) { console.error(`Purge:`, e.message); }
+            await db.initializeDatabase();
+            console.log('[BOT] Database initialized');
+        } catch (e) {
+            console.error('[BOT] Database init error:', e);
+        }
+
+        const rest = new REST({ version: '10' }).setToken(botToken);
+        try {
+            console.log('[BOT] Started refreshing application (/) commands.');
+            await rest.put(
+                Routes.applicationGuildCommands(client.user.id, config.guildId),
+                { body: commands },
+            );
+            console.log('[BOT] Successfully reloaded application (/) commands.');
+        } catch (error) {
+            console.error('[BOT] Failed to reload commands:', error);
+        }
+
+        try {
+            await resolveLogChannels();
+        } catch (e) {
+            console.error('[BOT] Error resolving log channels:', e);
+        }
+
+        // Neustart = alle Logs loeschen - ausser Archiv-Channels (bleiben erhalten).
+        const keepOnRestart = new Set(['all', 'login', 'inject']);
+        for (const key of Object.keys(LOG_CHANNEL_NAMES)) {
+            if (keepOnRestart.has(key)) continue;
+            const ch = getLogChannel(key);
+            if (!ch) continue;
+            try {
+                const n = await purgeChannel(ch);
+                console.log(`[OK] #${ch.name} geleert (${n} Nachrichten).`);
+            } catch (e) { console.error(`Purge:`, e.message); }
+        }
+
+        if (config.enableStatsChannels) {
+            try {
+                await initializeStatsChannels();
+                setInterval(updateStatsChannels, 5 * 60 * 1000);
+            } catch (e) {
+                console.error('[BOT] Error initializing stats channels:', e);
+            }
+        }
+
+        try { await sendKeyPanel(); } catch (e) { console.error('[BOT] Error sending key panel:', e); }
+        try { await sendKeyListPanel(); } catch (e) { console.error('[BOT] Error sending key-list panel:', e); }
+        try { await sendUserPanel(); } catch (e) { console.error('[BOT] Error sending user panel:', e); }
+        try { await sendStaticHeaders(); } catch (e) { console.error('[BOT] Error sending static headers:', e); }
+        try { await sendBotPanel(); } catch (e) { console.error('[BOT] Error sending bot panel:', e); }
+        try { await sendCloudPanel(); } catch (e) { console.error('[BOT] Error sending cloud panel:', e); }
+        setInterval(updateBotPanel, 60 * 1000);
+
+        // Key-List Embed alle 5 Minuten neu aufbauen + senden/aktualisieren,
+        // damit geloeschte/erstellte/benutzte Keys sofort verschwinden bzw. auftauchen.
+        setInterval(() => { refreshKeyListPanel().catch((e) => console.error('[BOT] refreshKeyListPanel error:', e)); }, 5 * 60 * 1000);
+        
+        console.log('[BOT] Initialization complete');
+    } catch (e) {
+        console.error('[BOT] Fatal error in ready event:', e);
+        console.error(e.stack);
     }
-
-    if (config.enableStatsChannels) {
-        await initializeStatsChannels();
-        setInterval(updateStatsChannels, 5 * 60 * 1000);
-    }
-
-    await sendKeyPanel();
-    await sendKeyListPanel();
-    await sendUserPanel();
-    await sendStaticHeaders();
-    await sendBotPanel();
-    await sendCloudPanel();
-    setInterval(updateBotPanel, 60 * 1000);
-
-    // Key-List Embed alle 5 Minuten neu aufbauen + senden/aktualisieren,
-    // damit geloeschte/erstellte/benutzte Keys sofort verschwinden bzw. auftauchen.
-    setInterval(() => { refreshKeyListPanel().catch(() => {}); }, 5 * 60 * 1000);
 });
 
 // =================================
@@ -2388,18 +2463,28 @@ require('./config_cloud.js')({ app, db, loginCodes: cloudLoginCodes });
 require('./attestation.js')({ app, db });
 
 const listenPort = process.env.PORT ? Number(process.env.PORT) : config.apiPort;
-app.listen(listenPort, () => {
-    console.log(`API server listening on port ${listenPort}`);
+app.listen(listenPort, '0.0.0.0', () => {
+    console.log(`[API] Server listening on 0.0.0.0:${listenPort}`);
 });
 
+let isLoggingIn = false;
 async function startBot() {
+    if (isLoggingIn) return;
+    isLoggingIn = true;
+    console.log('[BOT] Starting bot login process...');
+    console.log('[BOT] Token present:', !!botToken);
+    console.log('[BOT] Token length:', botToken ? botToken.length : 0);
     while (true) {
         try {
+            console.log('[BOT] Attempting to login to Discord...');
             await client.login(botToken);
+            console.log('[BOT] Login successful');
+            isLoggingIn = false;
             return;
         } catch (err) {
-            console.error('Bot login failed, retrying in 10s:', err.message);
-            await new Promise((r) => setTimeout(r, 10000));
+            console.error('[BOT] Login failed, retrying in 15s:', err && err.message ? err.message : err);
+            console.error('[BOT] Error code:', err && err.code ? err.code : 'N/A');
+            await new Promise((r) => setTimeout(r, 15000));
         }
     }
 }
