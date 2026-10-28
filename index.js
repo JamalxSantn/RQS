@@ -2564,6 +2564,14 @@ async function startBot() {
             console.log('[BOT] Attempting to login to Discord...');
             await client.login(botToken);
             console.log('[BOT] Login call returned - waiting for ready event');
+            // If not ready after 90 seconds, retry
+            setTimeout(() => {
+                if (!client.isReady()) {
+                    console.log('[BOT] Not ready after timeout, destroying and retrying...');
+                    client.destroy();
+                    startBot();
+                }
+            }, 90000);
             break;
         } catch (err) {
             console.error('[BOT] Login failed, retrying in 15s:', err && err.message ? err.message : err);
