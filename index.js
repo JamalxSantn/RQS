@@ -1037,10 +1037,19 @@ async function updateStatsChannels() {
 client.on('interactionCreate', async interaction => {
     try {
         if (interaction.isChatInputCommand()) {
+            const cmd = interaction.commandName;
+            if (['licenses-check', 'stats', 'freeze', 'unfreeze', 'addtime'].includes(cmd)) {
+                if (!interaction.deferred && !interaction.replied) {
+                    try { await interaction.deferReply({ ephemeral: true }); } catch (e) {}
+                }
+            }
             await handleSlashCommand(interaction);
         } else if (interaction.isButton()) {
             await handleButton(interaction);
         } else if (interaction.isModalSubmit()) {
+            if (!interaction.deferred && !interaction.replied) {
+                try { await interaction.deferReply({ ephemeral: true }); } catch (e) {}
+            }
             await handleModal(interaction);
         }
     } catch (err) {
