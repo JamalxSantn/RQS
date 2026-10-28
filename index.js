@@ -1066,6 +1066,9 @@ async function handleSlashCommand(interaction) {
 
     if (commandName === 'generate-license') {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
+            if (interaction.deferred) {
+                return interaction.editReply({ content: "You don't have permission to use this command." });
+            }
             return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
         }
 
@@ -1074,6 +1077,9 @@ async function handleSlashCommand(interaction) {
             new ButtonBuilder().setCustomId('gen_month').setLabel('Key · Month').setStyle(ButtonStyle.Primary),
             new ButtonBuilder().setCustomId('gen_lifetime').setLabel('Key · Lifetime').setStyle(ButtonStyle.Success)
         );
+        if (interaction.deferred) {
+            return interaction.editReply({ content: 'Wähle den Key-Typ:', components: [row] });
+        }
         return interaction.reply({ content: 'Wähle den Key-Typ:', ephemeral: true, components: [row] });
     }
 
