@@ -1478,9 +1478,17 @@ async function showAllLicenses(interaction, page = 0, sortType = SORT_TYPES.DEFA
         );
 
     if (isUpdate) {
-        await interaction.editReply({ embeds: [embed], components: [row] });
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({ embeds: [embed], components: [row] });
+        } else {
+            await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        }
     } else {
-        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        if (interaction.deferred) {
+            await interaction.editReply({ embeds: [embed], components: [row] });
+        } else {
+            await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        }
     }
 }
 
