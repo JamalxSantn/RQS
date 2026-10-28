@@ -1489,6 +1489,9 @@ async function showSingleLicense(interaction, licenseKey) {
     const license = await db.getLicense(licenseKey);
     
     if (!license) {
+        if (interaction.deferred) {
+            return interaction.editReply({ content: "No license found with the provided key." });
+        }
         return interaction.reply({ content: "No license found with the provided key.", ephemeral: true });
     }
 
