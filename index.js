@@ -2547,16 +2547,12 @@ async function startBot() {
     while (true) {
         try {
             console.log('[BOT] Attempting to login to Discord...');
-            const loginPromise = client.login(botToken);
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Login timeout after 30s')), 30000)
-            );
-            await Promise.race([loginPromise, timeoutPromise]);
-            console.log('[BOT] Login successful - waiting for ready event');
+            await client.login(botToken);
+            console.log('[BOT] Login call returned - waiting for ready event');
             break;
         } catch (err) {
-            console.error('[BOT] Login failed, retrying in 10s:', err && err.message ? err.message : err);
-            await new Promise(r => setTimeout(r, 10000));
+            console.error('[BOT] Login failed, retrying in 15s:', err && err.message ? err.message : err);
+            await new Promise(r => setTimeout(r, 15000));
         }
     }
 }
