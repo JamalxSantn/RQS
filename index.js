@@ -109,14 +109,9 @@ process.on('uncaughtException', (err) => {
 //
 const client = new Client({
     intents: [
-        GatewayIntentBits.Guilds, 
-        GatewayIntentBits.GuildMembers, 
-        GatewayIntentBits.GuildMessages, 
-        GatewayIntentBits.DirectMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildVoiceStates
+        GatewayIntentBits.Guilds
     ],
-    partials: [Partials.Channel, Partials.Message, Partials.User, Partials.GuildMember]
+    partials: []
 });
 
 client.on('error', (error) => {
