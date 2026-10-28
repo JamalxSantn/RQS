@@ -2544,14 +2544,16 @@ async function startBot() {
     console.log('[BOT] Starting bot login process...');
     console.log('[BOT] Token present:', !!botToken);
     console.log('[BOT] Token length:', botToken ? botToken.length : 0);
-    try {
-        console.log('[BOT] Attempting to login to Discord...');
-        await client.login(botToken);
-        console.log('[BOT] Login call completed');
-    } catch (err) {
-        console.error('[BOT] Login failed:', err && err.message ? err.message : err);
-        console.error('[BOT] Error code:', err && err.code ? err.code : 'N/A');
-        setTimeout(() => startBot(), 20000);
+    while (true) {
+        try {
+            console.log('[BOT] Attempting to login to Discord...');
+            await client.login(botToken);
+            console.log('[BOT] Login successful - waiting for ready event');
+            break;
+        } catch (err) {
+            console.error('[BOT] Login failed, retrying in 10s:', err && err.message ? err.message : err);
+            await new Promise(r => setTimeout(r, 10000));
+        }
     }
 }
 startBot();
