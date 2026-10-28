@@ -454,9 +454,6 @@ client.once('ready', async () => {
         console.log(`[BOT] Ready event fired! Logged in as ${client.user.tag} (${client.user.id})`);
         console.log(`[BOT] Connected to ${client.guilds.cache.size} guild(s)`);
         console.log(`[BOT] Guild ID from config: ${config.guildId}`);
-        if (!client.guilds.cache.has(config.guildId)) {
-            console.error(`[BOT] WARNING: Config guildId ${config.guildId} not found in guild cache!`);
-        }
         try {
             await db.initializeDatabase();
             console.log('[BOT] Database initialized');
@@ -464,8 +461,8 @@ client.once('ready', async () => {
             console.error('[BOT] Database init error:', e);
         }
 
-        const rest = new REST({ version: '10' }).setToken(botToken);
         try {
+            const rest = new REST({ version: '10' }).setToken(botToken);
             console.log('[BOT] Started refreshing application (/) commands.');
             await rest.put(
                 Routes.applicationGuildCommands(client.user.id, config.guildId),
