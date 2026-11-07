@@ -1791,7 +1791,9 @@ async function createLicense(interaction, opts) {
 }
 
 async function handleModal(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ ephemeral: true });
+    }
 
     if (interaction.customId === 'user_check_modal') {
         const discordId = interaction.fields.getTextInputValue('discord_id').trim();
