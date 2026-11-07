@@ -1696,7 +1696,7 @@ async function handleButton(interaction) {
 
     if (interaction.customId === 'admin_discord') {
         if (!hasPriv(interaction.member, config.adminDiscordResetRoleId)) {
-            return interaction.reply({ content: "You don't have permission to use this function.", ephemeral: true });
+            return replyEphemeral("You don't have permission to use this function.");
         }
         const modal = new ModalBuilder().setCustomId('admin_discord_modal').setTitle('ADMIN: Reset Discord ID')
             .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('license_key').setLabel("Enter license key").setStyle(TextInputStyle.Short).setRequired(true)));
