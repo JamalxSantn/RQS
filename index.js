@@ -1623,7 +1623,7 @@ async function handleButton(interaction) {
 
     if (interaction.customId === 'licenses_check') {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
-            return interaction.reply({ content: "You don't have permission to use this function.", ephemeral: true });
+            return replyEphemeral("You don't have permission to use this function.");
         }
         return showAllLicenses(interaction, 0, SORT_TYPES.DEFAULT);
     }
