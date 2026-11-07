@@ -1596,6 +1596,9 @@ async function handleButton(interaction) {
         // Can't show modal if already deferred/replied
         if (interaction.deferred || interaction.replied) {
             console.log('[GEN] Interaction already acknowledged, cannot show modal');
+            try {
+                if (interaction.deferred) await interaction.editReply({ content: 'Bitte versuche es erneut (Interaktion abgelaufen).' });
+            } catch (e) {}
             return;
         }
 
