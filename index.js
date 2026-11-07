@@ -1535,14 +1535,22 @@ async function showSingleLicense(interaction, licenseKey) {
 
 // Handle pagination buttons
 async function handleButton(interaction) {
+    const replyEphemeral = async (content) => {
+        if (interaction.deferred) return interaction.editReply({ content });
+        return interaction.reply({ content, ephemeral: true });
+    };
+
     // ---- Config-Cloud Website-Login ----
     if (interaction.customId === 'cloud_panel_login') {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
-            return interaction.reply({ content: "You don't have permission to log in to the panel.", ephemeral: true });
+            return replyEphemeral("You don't have permission to log in to the panel.");
         }
         const code = makeCloudCode();
         cloudLoginCodes.set(code, { expires: Date.now() + 5 * 60 * 1000, adminTag: interaction.user.tag });
         console.log(`[CONFIG-CODE] ${code} generiert fuer ${interaction.user.tag}`);
+        if (interaction.deferred) {
+            return interaction.editReply({ content: `🔐 **Dein Login-Code:** \`${code}\`\n> Gültig **5 Minuten**. Gib ihn auf der Website ein: ${CLOUD_PANEL_URL}` });
+        }
         return interaction.reply({
             content: `🔐 **Dein Login-Code:** \`${code}\`\n> Gültig **5 Minuten**. Gib ihn auf der Website ein: ${CLOUD_PANEL_URL}`,
             ephemeral: true
@@ -1552,9 +1560,15 @@ async function handleButton(interaction) {
     // ---- Bot Restart (#bot Panel) ----
     if (interaction.customId === 'bot_restart') {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
-            return interaction.reply({ content: "You don't have permission to restart the bot.", ephemeral: true });
+            return replyEphemeral("You don't have permission to restart the bot.");
         }
-        await interaction.reply({ content: '🔄 Bot wird neugestartet ...', ephemeral: true }).catch(() => {});
+        try {
+            if (interaction.deferred) {
+                await interaction.editReply({ content: '🔄 Bot wird neugestartet ...' });
+            } else {
+                await interaction.reply({ content: '🔄 Bot wird neugestartet ...', ephemeral: true });
+            }
+        } catch (e) {}
         console.log(`Bot-Restart angefordert von ${interaction.user.tag}.`);
         setTimeout(() => process.exit(0), 1500);
         return;
@@ -1563,7 +1577,7 @@ async function handleButton(interaction) {
     // ---- User Check (#user Panel) ----
     if (interaction.customId === 'user_check') {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
-            return interaction.reply({ content: "You don't have permission to use this function.", ephemeral: true });
+            return replyEphemeral("You don't have permission to use this function.");
         }
         const modal = new ModalBuilder().setCustomId('user_check_modal').setTitle('User Check')
             .addComponents(new ActionRowBuilder().addComponents(
@@ -1574,7 +1588,7 @@ async function handleButton(interaction) {
     // ---- Key generation buttons (Day / Month / Lifetime) ----
     if (interaction.customId === 'gen_day' || interaction.customId === 'gen_month' || interaction.customId === 'gen_lifetime') {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
-            return interaction.reply({ content: "You don't have permission to create keys.", ephemeral: true });
+            return replyEphemeral("You don't have permission to create keys.");
         }
 
         const plan = interaction.customId.replace('gen_', '');
