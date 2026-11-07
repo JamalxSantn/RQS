@@ -1059,6 +1059,10 @@ client.on('interactionCreate', async interaction => {
 
 async function handleSlashCommand(interaction) {
     const { commandName } = interaction;
+    const reply = async (content) => {
+        if (interaction.deferred) return interaction.editReply({ content });
+        return interaction.reply({ content, ephemeral: true });
+    };
 
     if (commandName === 'generate-license') {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
