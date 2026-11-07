@@ -1646,7 +1646,7 @@ async function handleButton(interaction) {
 
     if (interaction.customId === 'freeze_key' || interaction.customId === 'unfreeze_key' || interaction.customId === 'addtime_key') {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
-            return interaction.reply({ content: "You don't have permission to use this function.", ephemeral: true });
+            return replyEphemeral("You don't have permission to use this function.");
         }
 
         const modalId = interaction.customId.replace('_key', '_modal');
