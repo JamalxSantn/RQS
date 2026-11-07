@@ -1637,7 +1637,7 @@ async function handleButton(interaction) {
 
     if (interaction.customId === 'delete_key') {
         if (!hasPriv(interaction.member, config.deleteRoleId)) {
-            return interaction.reply({ content: "You don't have permission to use this function.", ephemeral: true });
+            return replyEphemeral("You don't have permission to use this function.");
         }
         const modal = new ModalBuilder().setCustomId('delete_license_modal').setTitle('Delete a License')
             .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('license_key').setLabel("License key to delete").setStyle(TextInputStyle.Short).setRequired(true)));
