@@ -1045,13 +1045,13 @@ client.on('interactionCreate', async interaction => {
             await handleModal(interaction);
         }
     } catch (err) {
-        console.error(`[INTERACTION-ERROR] id=${interaction.customId || interaction.commandName} von ${interaction.user ? interaction.user.tag : '?'}:`, err && err.stack ? err.stack : err);
+        console.error(`[INTERACTION-ERROR] id=${interaction.customId || interaction.commandName} type=${interaction.type} deferred=${interaction.deferred} replied=${interaction.replied} von ${interaction.user ? interaction.user.tag : '?'}:`, err && err.stack ? err.stack : err);
         try {
             const msg = `⚠️ Fehler bei dieser Aktion: ${err && err.message ? err.message : err}`;
-            if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-                await interaction.reply({ content: msg, ephemeral: true });
+            if (interaction.deferred || interaction.replied) {
+                await interaction.followUp({ content: msg, ephemeral: true }).catch(() => {});
             } else if (interaction.isRepliable()) {
-                await interaction.followUp({ content: msg, ephemeral: true });
+                await interaction.reply({ content: msg, ephemeral: true }).catch(() => {});
             }
         } catch (_) {}
     }
