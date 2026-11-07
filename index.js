@@ -1722,7 +1722,7 @@ async function handleButton(interaction) {
     } 
     else if (interaction.customId.startsWith('licenses_prev_') || interaction.customId.startsWith('licenses_next_')) {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
-            return interaction.reply({ content: "You don't have permission to use this function.", ephemeral: true });
+            return replyEphemeral("You don't have permission to use this function.");
         }
 
         const parts = interaction.customId.split('_');
@@ -1737,7 +1737,7 @@ async function handleButton(interaction) {
     }
     else if (interaction.customId.startsWith('licenses_sort_')) {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
-            return interaction.reply({ content: "You don't have permission to use this function.", ephemeral: true });
+            return replyEphemeral("You don't have permission to use this function.");
         }
 
         const parts = interaction.customId.split('_');
