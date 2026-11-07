@@ -1593,6 +1593,11 @@ async function handleButton(interaction) {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
             return replyEphemeral("You don't have permission to create keys.");
         }
+        // Can't show modal if already deferred/replied
+        if (interaction.deferred || interaction.replied) {
+            console.log('[GEN] Interaction already acknowledged, cannot show modal');
+            return;
+        }
 
         const plan = interaction.customId.replace('gen_', '');
         const title = plan === 'day' ? 'Key · Day' : plan === 'month' ? 'Key · Month' : 'Key · Lifetime';
@@ -1621,7 +1626,12 @@ async function handleButton(interaction) {
             modal.addComponents(new ActionRowBuilder().addComponents(resetsInput));
         }
 
-        return interaction.showModal(modal);
+        try {
+            return await interaction.showModal(modal);
+        } catch (e) {
+            console.error('[GEN] Failed to show modal:', e.message);
+            throw e;
+        }
     }
 
     if (interaction.customId === 'licenses_check') {
