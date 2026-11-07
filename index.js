@@ -1687,7 +1687,7 @@ async function handleButton(interaction) {
 
     if (interaction.customId === 'admin_hwid') {
         if (!hasPriv(interaction.member, config.adminHwidResetRoleId)) {
-            return interaction.reply({ content: "You don't have permission to use this function.", ephemeral: true });
+            return replyEphemeral("You don't have permission to use this function.");
         }
         const modal = new ModalBuilder().setCustomId('admin_hwid_modal').setTitle('ADMIN: Reset HWID')
             .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('license_key').setLabel("Enter license key").setStyle(TextInputStyle.Short).setRequired(true)));
