@@ -1630,7 +1630,7 @@ async function handleButton(interaction) {
 
     if (interaction.customId === 'stats') {
         if (!hasPriv(interaction.member, config.adminRoleId)) {
-            return interaction.reply({ content: "You don't have permission to use this function.", ephemeral: true });
+            return replyEphemeral("You don't have permission to use this function.");
         }
         return showDetailedStats(interaction);
     }
